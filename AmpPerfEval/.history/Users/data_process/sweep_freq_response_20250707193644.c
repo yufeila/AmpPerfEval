@@ -19,6 +19,8 @@ uint8_t key_state = 0;
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
 static uint8_t current_point = 0;           // 当前测量频率点索引：0到FREQ_POINTS-1
+// 全局静态变量，用于检测模式切换
+static uint8_t last_sweep_mode_state = 0;   // 记录上次的扫频模式状态（0=未激活，1=激活）
 
 /* 输出阻抗测量相关 */
 static uint8_t r_out_measured = 0;          // R_out测量完成标志：0=未测量，1=已测量
@@ -41,7 +43,6 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
 static float CalculateRout(SpectrumResult_t* v_out_with_load, SpectrumResult_t* v_out_open_drain);
 static float CalculateRin(SignalAnalysisResult_t* res);
 static void Reset_Rout_Measurement(void);
-static void Force_Stop_All_Operations(void);
 /* ===== 显示函数 ===== */
 void LCD_Display_Title_Center(const char* title, uint16_t y_pos);
 void Basic_Measurement_Page_Init(void);
@@ -114,20 +115,19 @@ void Basic_Measurement(void)
     // 检测是否从其他模式切换回来，如果是则重置R_out测量状态
     if (basic_measurement_flag)
     {
-        // 强制停止所有运行中的操作
-        Force_Stop_All_Operations();
-        
         first_refresh = 1;
         basic_measurement_flag = 0;
         // 从其他模式切换回基本测量模式时，重置R_out测量状态
         Reset_Rout_Measurement();
     }
 
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
+
     if(first_refresh)
     {
         // 完全清除屏幕内容，确保没有残留显示
         LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
         
         // 设置DDS频率为1000Hz
         AD9851_Set_Frequency(1000);
@@ -323,23 +323,6 @@ static void Reset_Rout_Measurement(void)
     r_out_measured = 0;     // 重置测量完成标志
     r_out_value = 0.0f;     // 重置测量值
     measure_r_out_flag = 0; // 重置测量触发标志
-}
-
-/**
- * @brief 强制停止所有运行中的操作，用于模式切换
- * @retval None
- */
-static void Force_Stop_All_Operations(void)
-{
-    // 停止ADC+DMA+TIM系统
-    HAL_ADC_Stop_DMA(&hadc1);
-    HAL_TIM_Base_Stop(&htim2);
-    
-    // 重置ADC缓冲区标志
-    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
-    
-    // 关闭继电器（如果开启的话）
-    RELAY_OFF;
 }
 
 
@@ -581,21 +564,20 @@ void Auto_Frequency_Response_Measurement(void)
 {
     static uint8_t first_refresh = 1;  // 控制扫频测量页面初始刷新
     
-    // 检测是否从其他模式切换到扫频模式
+    // 检测是否从其他模式切换回来，如果是则重新开始测量
     if (sweep_freq_response_flag)
     {
-        // 强制停止所有运行中的操作
-        Force_Stop_All_Operations();
-        
         first_refresh = 1;  // 触发重新初始化
         sweep_freq_response_flag = 0;  // 清除标志位
     }
+    
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
     
     if(first_refresh)
     {
         // 完全清除屏幕内容，确保没有残留显示
         LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
         
         // 初始化页面显示
         LCD_Display_Title_Center("Frequency Response", 10);

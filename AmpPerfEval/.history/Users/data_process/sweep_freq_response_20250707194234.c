@@ -123,6 +123,9 @@ void Basic_Measurement(void)
         Reset_Rout_Measurement();
     }
 
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
+
     if(first_refresh)
     {
         // 完全清除屏幕内容，确保没有残留显示

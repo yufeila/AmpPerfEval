@@ -19,10 +19,8 @@ uint8_t key_state = 0;
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
 static uint8_t current_point = 0;           // 当前测量频率点索引：0到FREQ_POINTS-1
-
-/* 输出阻抗测量相关 */
-static uint8_t r_out_measured = 0;          // R_out测量完成标志：0=未测量，1=已测量
-static float r_out_value = 0.0f;            // 存储测量的R_out值
+// 全局静态变量，用于检测模式切换
+static uint8_t last_sweep_mode_state = 0;   // 记录上次的扫频模式状态（0=未激活，1=激活）
 
 
 // 内部函数声明
@@ -39,9 +37,6 @@ static void DemuxADCData(const uint16_t *src,
 static void CalcArrayMean(const float* buf, float *pRes);
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs);
 static float CalculateRout(SpectrumResult_t* v_out_with_load, SpectrumResult_t* v_out_open_drain);
-static float CalculateRin(SignalAnalysisResult_t* res);
-static void Reset_Rout_Measurement(void);
-static void Force_Stop_All_Operations(void);
 /* ===== 显示函数 ===== */
 void LCD_Display_Title_Center(const char* title, uint16_t y_pos);
 void Basic_Measurement_Page_Init(void);
@@ -111,29 +106,23 @@ void Basic_Measurement(void)
     static uint8_t first_refresh = 1;  // 控制基本测量页面初始刷新
     static float current_fs = 0.0f;   // 当前采样率
 
-    // 检测是否从其他模式切换回来，如果是则重置R_out测量状态
+    // 检测是否从扫频模式切换回来
     if (basic_measurement_flag)
     {
-        // 强制停止所有运行中的操作
-        Force_Stop_All_Operations();
-        
         first_refresh = 1;
         basic_measurement_flag = 0;
-        // 从其他模式切换回基本测量模式时，重置R_out测量状态
-        Reset_Rout_Measurement();
     }
+
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
 
     if(first_refresh)
     {
-        // 完全清除屏幕内容，确保没有残留显示
-        LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
-        
         // 设置DDS频率为1000Hz
         AD9851_Set_Frequency(1000);
         
-        // 只配置定时器，不启动ADC+DMA+TIM系统
-        current_fs = Tim2_Config_AutoFs(1000.0f);
+        // 启动ADC+DMA+TIM系统，配置到1000Hz对应的采样率，并获取实际采样率
+        current_fs = Start_ADC_DMA_TIM_System(1000.0f);
         
         // 初始化屏幕显示
         Basic_Measurement_Page_Init();
@@ -154,6 +143,7 @@ void Basic_Measurement(void)
         // 开启继电器
         RELAY_ON;
 
+
         static SignalAnalysisResult_t v_out_with_load[PROCESS_ARRAY_SIZE_WITH_R_L];
         // 延时等待稳定
         HAL_Delay(500);
@@ -170,14 +160,12 @@ void Basic_Measurement(void)
 		}
 		average_spectrumresult_array(tmp, &v_out, PROCESS_ARRAY_SIZE_WITH_R_L);
 
-        // 计算并保存R_out结果
-        r_out_value = CalculateRout(&v_out, &v_open_drain_out);
-        r_out_measured = 1;  // 标记已测量完成
 
-        measure_r_out_flag = 0;  // 清除测量触发标志位
-        
-        // 关闭继电器
-        RELAY_OFF;
+        float R_out = CalculateRout(&v_out, &v_open_drain_out);
+
+        DisplayRout(R_out);
+
+        measure_r_out_flag = 0;  // 测量完成，清除标志位
     }
 
 }
@@ -192,49 +180,31 @@ void Basic_Measurement(void)
  */
 uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3, float fs)
 {  
+    uint8_t new_data = 0;
     static float adc_in_buffer[FFT_SIZE];      // 通道1
     static float adc_ac_out_buffer[FFT_SIZE];  // 通道2
     static float adc_dc_out_buffer[FFT_SIZE];  // 通道3
 
-    // 1. 启动本轮ADC+DMA+TIM采集
-    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
-    HAL_TIM_Base_Start(&htim2);
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, BUF_SIZE) != HAL_OK)
+    // 数据采集和分装：
+    // 1. 从DMA缓存区搬运数据
+    // 2. 将数据分装成到3个子数组
+    // 3. 分别处理3个子数组中的数据
+    if (ADC_BufferReadyFlag == BUFFER_READY_FLAG_FULL)
     {
-        Error_Handler();
-    }
-    
-    // 2. 等待本轮数据采集完成
-    uint32_t timeout = 0;
-    while (ADC_BufferReadyFlag != BUFFER_READY_FLAG_FULL && timeout < 1000)
-    {
-        HAL_Delay(1);  // 短暂延时，避免CPU占用过高
-        timeout++;
-    }
-    
-    // 3. 检查是否超时
-    if (timeout >= 1000)
-    {
-        // 超时处理：停止ADC+TIM，返回无新数据
-        HAL_ADC_Stop_DMA(&hadc1);
-        HAL_TIM_Base_Stop(&htim2);
-        return 0;
-    }
-    
-    // 4. 停止当前轮次的ADC+TIM（为下次启动做准备）
-    HAL_ADC_Stop_DMA(&hadc1);
-    HAL_TIM_Base_Stop(&htim2);
-    
-    // 5. 处理本轮采集的数据
-    const uint16_t *src = (const uint16_t *)&adc_buffer[0];
-    DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
-    
-    // 6. 分别处理3个子数组中的数据
-    ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
-    ProcessSampleData_F32(adc_ac_out_buffer, pRes2, fs);
-    CalcArrayMean(adc_dc_out_buffer, pRes3);
+        //  将数据分装成到3个子数组
+        const uint16_t *src = (const uint16_t *)&adc_buffer[0];
+        DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
+        ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
 
-    return 1;  // 返回有新数据
+        // 分别处理3个子数组中的数据，使用传入的采样率参数
+        ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
+        ProcessSampleData_F32(adc_ac_out_buffer, pRes2, fs);
+        CalcArrayMean(adc_dc_out_buffer, pRes3);
+
+        new_data = 1;
+    }
+
+    return new_data;
 }
 
 /**
@@ -313,35 +283,6 @@ static float CalculateRin(SignalAnalysisResult_t* res)
     float Rin = (V_s - res->adc_in_Result.amplitude/V_Rs_Gain)/(res->adc_in_Result.amplitude/V_Rs_Gain) * R_s;
     return Rin;  // kΩ
 }
-/* ===== 硬件控制函数 ===== */
-/**
- * @brief 重置输出阻抗测量状态
- * @retval None
- */
-static void Reset_Rout_Measurement(void)
-{
-    r_out_measured = 0;     // 重置测量完成标志
-    r_out_value = 0.0f;     // 重置测量值
-    measure_r_out_flag = 0; // 重置测量触发标志
-}
-
-/**
- * @brief 强制停止所有运行中的操作，用于模式切换
- * @retval None
- */
-static void Force_Stop_All_Operations(void)
-{
-    // 停止ADC+DMA+TIM系统
-    HAL_ADC_Stop_DMA(&hadc1);
-    HAL_TIM_Base_Stop(&htim2);
-    
-    // 重置ADC缓冲区标志
-    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
-    
-    // 关闭继电器（如果开启的话）
-    RELAY_OFF;
-}
-
 
 /* ===== 显示函数 ===== */
 /**
@@ -523,33 +464,14 @@ void Basic_Measurement_Page_Update(void)
     sprintf(dispBuff, "%.3f V", data_at_1k.adc_dc_out_Result);  // 修正：去掉.amplitude
     LCD_ShowString(90, 235, 120, 12, 12, (uint8_t*)dispBuff);
     
-    /* 输出阻抗部分 - 根据测量状态显示 */
-    LCD_Fill(60, 190, 230, 202, WHITE);
-    if(r_out_measured)
+    /* 输出阻抗部分 - 仅在measure_r_out_flag为0时显示空白 */
+    if(measure_r_out_flag == 0)
     {
-        // 显示测量结果
-        sprintf(dispBuff, "%.3f kΩ", r_out_value);
-        LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)dispBuff);
+        // 清除输出阻抗显示区域，不显示数值
+        LCD_Fill(60, 190, 230, 202, WHITE);
+        LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)"--- kΩ");  // 显示占位符
     }
-    else
-    {
-        // 显示未测量状态
-        LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)"--- kΩ");
-    }
-    
-    /* 显示Vout(RL) - 修复缺失的显示 */
-    if(r_out_measured)
-    {
-        // 如果已测量输出阻抗，显示负载电压（这里需要保存测量时的值）
-        LCD_Fill(100, 160, 230, 172, WHITE);
-        LCD_ShowString(100, 160, 120, 12, 12, (uint8_t*)"(measured)");
-    }
-    else
-    {
-        // 未测量时显示占位符
-        LCD_Fill(100, 160, 230, 172, WHITE);
-        LCD_ShowString(100, 160, 120, 12, 12, (uint8_t*)"--- V");
-    }
+    // 注意：当measure_r_out_flag==1时，输出阻抗会在Basic_Measurement函数中通过DisplayRout函数显示
 }
 
 /**
@@ -581,23 +503,17 @@ void Auto_Frequency_Response_Measurement(void)
 {
     static uint8_t first_refresh = 1;  // 控制扫频测量页面初始刷新
     
-    // 检测是否从其他模式切换到扫频模式
-    if (sweep_freq_response_flag)
+    // 检测是否从其他模式切换回来，如果是则重新开始测量
+    if(current_system_state == SWEEP_FREQ_RESPONSE_STATE && last_sweep_mode_state == 0)
     {
-        // 强制停止所有运行中的操作
-        Force_Stop_All_Operations();
-        
         first_refresh = 1;  // 触发重新初始化
-        sweep_freq_response_flag = 0;  // 清除标志位
     }
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;  // 更新模式状态记录
     
     if(first_refresh)
     {
-        // 完全清除屏幕内容，确保没有残留显示
-        LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
-        
         // 初始化页面显示
+        LCD_Clear(WHITE);
         LCD_Display_Title_Center("Frequency Response", 10);
         Draw_Coordinate_System();
         
@@ -1088,7 +1004,6 @@ void Stop_ADC_DMA_TIM_System(void)
     HAL_TIM_Base_Stop(&htim2);
     ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
 }
-
 
 
 

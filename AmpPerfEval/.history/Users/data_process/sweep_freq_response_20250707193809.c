@@ -19,6 +19,8 @@ uint8_t key_state = 0;
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
 static uint8_t current_point = 0;           // 当前测量频率点索引：0到FREQ_POINTS-1
+// 全局静态变量，用于检测模式切换
+static uint8_t last_sweep_mode_state = 0;   // 记录上次的扫频模式状态（0=未激活，1=激活）
 
 /* 输出阻抗测量相关 */
 static uint8_t r_out_measured = 0;          // R_out测量完成标志：0=未测量，1=已测量
@@ -123,11 +125,13 @@ void Basic_Measurement(void)
         Reset_Rout_Measurement();
     }
 
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
+
     if(first_refresh)
     {
         // 完全清除屏幕内容，确保没有残留显示
         LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
         
         // 设置DDS频率为1000Hz
         AD9851_Set_Frequency(1000);
@@ -581,21 +585,24 @@ void Auto_Frequency_Response_Measurement(void)
 {
     static uint8_t first_refresh = 1;  // 控制扫频测量页面初始刷新
     
-    // 检测是否从其他模式切换到扫频模式
+    // 检测是否从其他模式切换回来，如果是则重新开始测量
     if (sweep_freq_response_flag)
     {
-        // 强制停止所有运行中的操作
-        Force_Stop_All_Operations();
+        // 停止可能正在运行的ADC+DMA+TIM系统
+        HAL_ADC_Stop_DMA(&hadc1);
+        HAL_TIM_Base_Stop(&htim2);
         
         first_refresh = 1;  // 触发重新初始化
         sweep_freq_response_flag = 0;  // 清除标志位
     }
     
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
+    
     if(first_refresh)
     {
         // 完全清除屏幕内容，确保没有残留显示
         LCD_Clear(WHITE);
-        HAL_Delay(50);  // 短暂延时，确保LCD清除完成
         
         // 初始化页面显示
         LCD_Display_Title_Center("Frequency Response", 10);

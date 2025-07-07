@@ -19,6 +19,8 @@ uint8_t key_state = 0;
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
 static uint8_t current_point = 0;           // 当前测量频率点索引：0到FREQ_POINTS-1
+// 全局静态变量，用于检测模式切换
+static uint8_t last_sweep_mode_state = 0;   // 记录上次的扫频模式状态（0=未激活，1=激活）
 
 /* 输出阻抗测量相关 */
 static uint8_t r_out_measured = 0;          // R_out测量完成标志：0=未测量，1=已测量
@@ -122,6 +124,9 @@ void Basic_Measurement(void)
         // 从其他模式切换回基本测量模式时，重置R_out测量状态
         Reset_Rout_Measurement();
     }
+
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
 
     if(first_refresh)
     {
