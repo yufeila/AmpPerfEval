@@ -41,7 +41,6 @@ extern "C" {
 /* USER CODE END Includes */
 
 extern ADC_HandleTypeDef hadc1;
-extern __IO uint16_t adc_buffer[BUF_SIZE];
 
 /* USER CODE BEGIN Private defines */
 #define Start_ADC_DMA   HAL_ADC_Start_DMA(&hadc1, adc_buffer, BUF_SIZE)
