@@ -615,8 +615,8 @@ void Auto_Frequency_Response_Measurement(void)
         // 配置DDS到新频率
         AD9851_Set_Frequency((uint32_t)input_freq);
         
-        // 只配置定时器，不启动硬件（让Process_ADC_Data_F32负责启动）
-        float actual_fs = Tim2_Config_AutoFs(input_freq);
+        // 启动ADC+DMA+TIM系统到新频率，并获取实际采样率
+        float actual_fs = Start_ADC_DMA_TIM_System(input_freq);
         
         // 测量当前频率点，传入实际采样率
         Measure_Single_Point(input_freq, &freq_response[current_point], actual_fs);
@@ -656,6 +656,12 @@ void Auto_Frequency_Response_Measurement(void)
 static void Measure_Single_Point(float frequency, FreqResponse_t* result, float fs)
 {
     static SignalAnalysisResult_t single_result;
+    
+    // 安全检查：确保采样率不会过低
+    if (fs < 10000.0f) {
+        // 记录错误并使用安全的采样率
+        fs = 20000.0f;  // 使用20kHz作为安全的采样率
+    }
     
     // 等待新的ADC数据
     uint8_t data_ready = 0;

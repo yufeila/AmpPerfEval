@@ -190,6 +190,47 @@ void Basic_Measurement(void)
  * @param  float* pRes3      pRes3: adc_dc_out
  * @retval 1 表示已生成新结果，0 表示无新结果
  */
+/**
+ * @brief 等待并处理ADC数据（用于扫频测量）
+ * @param pRes1 通道1频谱分析结果
+ * @param pRes2 通道2频谱分析结果  
+ * @param pRes3 通道3直流分析结果
+ * @param fs 采样频率
+ * @retval 1-有新数据, 0-超时无数据
+ */
+uint8_t Wait_And_Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3, float fs)
+{  
+    static float adc_in_buffer[FFT_SIZE];      // 通道1
+    static float adc_ac_out_buffer[FFT_SIZE];  // 通道2
+    static float adc_dc_out_buffer[FFT_SIZE];  // 通道3
+
+    // 1. 等待当前轮次数据采集完成（硬件已在Start_ADC_DMA_TIM_System中启动）
+    uint32_t timeout = 0;
+    while (ADC_BufferReadyFlag != BUFFER_READY_FLAG_FULL && timeout < 1000)
+    {
+        HAL_Delay(1);  // 短暂延时，避免CPU占用过高
+        timeout++;
+    }
+    
+    // 2. 检查是否超时
+    if (timeout >= 1000)
+    {
+        // 超时处理：返回无新数据
+        return 0;
+    }
+    
+    // 3. 处理本轮采集的数据
+    const uint16_t *src = (const uint16_t *)&adc_buffer[0];
+    DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
+    
+    // 4. 分别处理3个子数组中的数据
+    ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
+    ProcessSampleData_F32(adc_ac_out_buffer, pRes2, fs);
+    CalcArrayMean(adc_dc_out_buffer, pRes3);
+
+    return 1;  // 返回有新数据
+}
+
 uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3, float fs)
 {  
     static float adc_in_buffer[FFT_SIZE];      // 通道1
