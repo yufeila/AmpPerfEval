@@ -1,27 +1,27 @@
 #include "sweep_freq_response.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 //外部变量声明
 extern __IO  uint16_t adc_buffer[BUF_SIZE];
 extern volatile uint8_t ADC_BufferReadyFlag;
-extern uint8_t basic_measurement; 
-extern uint8_t sweep_freq_response;
-extern uint8_t measure_r_out;
+extern uint8_t basic_measurement_flag; 
+extern uint8_t sweep_freq_response_flag;
+extern uint8_t measure_r_out_flag;
+extern uint8_t current_system_state;
 
 // 全局变量声明
 /* 基本参数显示 */
 static SignalAnalysisResult_t data_at_1k;
 static SignalAnalysisResult_t last_data_at_1k;
-static char             dispBuff[48];           // 屏幕打印缓冲区
-static uint8_t          first_refresh1 = 1;      // 控制初始屏幕刷新
-static uint8_t          first_refresh2 = 0;      // 控制初始屏幕刷新
-static uint8_t          measure_R_out = 0;
 uint8_t key_state = 0;
 /* 扫频参数 */
 static FreqResponse_t freq_response[FREQ_POINTS];
-static uint8_t measurement_complete = 0;
-static uint8_t current_point = 0;
+static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
+static uint8_t current_point = 0;           // 当前测量频率点索引：0到FREQ_POINTS-1
+// 全局静态变量，用于检测模式切换
+static uint8_t last_sweep_mode_state = 0;   // 记录上次的扫频模式状态（0=未激活，1=激活）
 
 
 // 内部函数声明
@@ -29,14 +29,14 @@ static uint8_t current_point = 0;
 /* ===== 数据处理函数 ===== */
 static float average_float_array(const float *arr, int N);
 static void average_spectrumresult_array(SpectrumResult_t *res, SpectrumResult_t *avg_res, int N);
-uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3);
+uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3, float fs);
 static void DemuxADCData(const uint16_t *src,
                   float *buf1,
                   float *buf2,
                   float *buf3,
                   uint16_t len);
 static void CalcArrayMean(const float* buf, float *pRes);
-static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes);
+static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs);
 static float CalculateRout(SpectrumResult_t* v_out_with_load, SpectrumResult_t* v_out_open_drain);
 /* ===== 显示函数 ===== */
 void LCD_Display_Title_Center(const char* title, uint16_t y_pos);
@@ -50,9 +50,10 @@ static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, i
 
 /* ============ 扫频测量部分 ============ */
 static float Calculate_Log_Frequency(uint8_t point_index);
+static float Find_3dB_Frequency(FreqResponse_t* freq_response, int len);
 static void LCD_Display_Title(const char* title);
 static void Display_Frequency_Response_Curve(void);
-static void Measure_Single_Point(float frequency, FreqResponse_t* result);
+static void Measure_Single_Point(float frequency, FreqResponse_t* result, float fs);
 static void Draw_Frequency_Response_Points(void);
 static void Draw_Coordinate_System(void);
 static void Display_Measurement_Info(void);
@@ -107,31 +108,38 @@ static void average_spectrumresult_array(SpectrumResult_t *res, SpectrumResult_t
  */
 void Basic_Measurement(void)
 {
-    static float fs = 0;
-    if(first_fresh1)
+    static uint8_t first_refresh = 1;  // 控制基本测量页面初始刷新
+    static float current_fs = 0.0f;   // 当前采样率
+
+    // 更新扫频模式状态记录，确保模式切换检测正常工作
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;
+
+    if(first_refresh)
     {
-        // DDS模块输出频率
+        // 设置DDS频率为1000Hz
         AD9851_Set_Frequency(1000);
-        // 配置时基单元
-        fs = Tim2_Config_AutoFs(float f0_hz);
+        
+        // 启动ADC+DMA+TIM系统，配置到1000Hz对应的采样率，并获取实际采样率
+        current_fs = Start_ADC_DMA_TIM_System(1000.0f);
+        
         // 初始化屏幕显示
         Basic_Measurement_Page_Init();
-        first_fresh1 = 0;
-        first_fresh2 = 1;
+        first_refresh = 0;
     }
 
-    // 数据采集和处理
-    Process_ADC_Data_F32(&data_at_1k.adc_in_Result, &data_at_1k.adc_ac_out_Result, &data_at_1k.adc_dc_out_Result);
+    // 数据采集和处理，使用实际的采样率
+    Process_ADC_Data_F32(&data_at_1k.adc_in_Result, &data_at_1k.adc_ac_out_Result, &data_at_1k.adc_dc_out_Result, current_fs);
 
     // 数据更新和显示
     Basic_Measurement_Page_Update();
 
-    if(measure_r_out)
+    if(measure_r_out_flag)
     {
+        // 锁存上一次测量结果
         SpectrumResult_t v_open_drain_out = data_at_1k.adc_ac_out_Result;
         SpectrumResult_t v_out ;
         // 开启继电器
-        Relay_ON;
+        RELAY_ON;
 
         static uint8_t cnt;
 
@@ -141,7 +149,7 @@ void Basic_Measurement(void)
 
         for(uint8_t i = 0; i<PROCESS_ARRAY_SIZE_WITH_R_L; i++)
         {
-            Process_ADC_Data_F32(&v_out_with_load[i].adc_in_Result, &v_out_with_load[i].adc_ac_out_Result, &v_out_with_load[i].adc_dc_out_Result);
+            Process_ADC_Data_F32(&v_out_with_load[i].adc_in_Result, &v_out_with_load[i].adc_ac_out_Result, &v_out_with_load[i].adc_dc_out_Result, current_fs);
         }
 
         average_spectrumresult_array(&v_out_with_load, &v_out, PROCESS_ARRAY_SIZE_WITH_R_L);
@@ -151,7 +159,7 @@ void Basic_Measurement(void)
 
         DisplayRout(R_out);
 
-        measure_r_out = 0;
+        measure_r_out_flag = 0;  // 测量完成，清除标志位
     }
 
 }
@@ -166,12 +174,10 @@ void Basic_Measurement(void)
  */
 uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, float* pRes3, float fs)
 {  
-    //启动ADC和DMA
-  Start_ADC_DMA;
-  uint8_t new_data = 0;
-  static float adc_in_buffer[FFT_SIZE];      // 通道1
-  static float adc_ac_out_buffer[FFT_SIZE];  // 通道2
-  static float adc_dc_out_buffer[FFT_SIZE];  // 通道3
+    uint8_t new_data = 0;
+    static float adc_in_buffer[FFT_SIZE];      // 通道1
+    static float adc_ac_out_buffer[FFT_SIZE];  // 通道2
+    static float adc_dc_out_buffer[FFT_SIZE];  // 通道3
 
     // 数据采集和分装：
     // 1. 从DMA缓存区搬运数据
@@ -181,11 +187,10 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     {
         //  将数据分装成到3个子数组
         const uint16_t *src = (const uint16_t *)&adc_buffer[0];
-        DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);                      // 数据分拣
+        DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
         ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
 
-
-        // 分别处理3个子数组中的数据
+        // 分别处理3个子数组中的数据，使用传入的采样率参数
         ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
         ProcessSampleData_F32(adc_ac_out_buffer, pRes2, fs);
         CalcArrayMean(adc_dc_out_buffer, pRes3);
@@ -239,16 +244,14 @@ static void CalcArrayMean(const float* buf, float *pRes)
  *----------------------------------------------------*/
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs)
 {
-  
+    const uint8_t process_interval = PROCESS_INTERVAL;   // 每隔N个循环执行一次FFT
+    static uint8_t process_counter  = 0;
 
-  const uint8_t process_interval = PROCESS_INTERVAL;   // 每隔 3 while循环执行一次 FFT
-  static uint8_t process_counter  = 0;
-
-  if (++process_counter >= process_interval)
-  {
-    process_counter = 0;
-    spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
-  }
+    if (++process_counter >= process_interval)
+    {
+        process_counter = 0;
+        spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
+    }
 }
 
 /**
@@ -259,6 +262,11 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
  */
 static float CalculateRout(SpectrumResult_t* v_out_with_load, SpectrumResult_t* v_out_open_drain)
 {
+    if(v_out_with_load->amplitude > 0.001f)  // 避免除零
+    {
+        return (v_out_open_drain->amplitude - v_out_with_load->amplitude) / v_out_with_load->amplitude * R_L;
+    }
+    return 0.0f;  // 如果分母太小，返回0
     if(v_out_with_load->amplitude > 0.001f)  // 避免除零
     {
         return (v_out_open_drain->amplitude - v_out_with_load->amplitude) / v_out_with_load->amplitude * R_L;
@@ -417,18 +425,20 @@ void LCD_Display_Frequency(float frequency, uint16_t x, uint16_t y, uint16_t col
  */
 void Basic_Measurement_Page_Update(void)  
 {
+    char dispBuff[48];  // 局部字符串缓冲区
+    
     // 设置颜色
     POINT_COLOR = DATA_COLOR;
     BACK_COLOR = WHITE;
     
     /* 输入部分 */
     // 电压显示 (Vs:)
-    LCD_Fill(38, 70, 230, 82, WHITE);
+    LCD_Fill(60, 70, 230, 82, WHITE);
     sprintf(dispBuff, "%.3f V", data_at_1k.adc_in_Result.amplitude); 
     LCD_ShowString(60, 70, 120, 12, 12, (uint8_t*)dispBuff);
 
     // 频率显示 (fs:)
-    LCD_Fill(38, 85, 230, 97, WHITE);
+    LCD_Fill(60, 85, 230, 97, WHITE);
     LCD_Display_Frequency(data_at_1k.adc_in_Result.frequency, 60, 85, DATA_COLOR);
 
     // 输入阻抗显示 (Rin:)
@@ -443,8 +453,8 @@ void Basic_Measurement_Page_Update(void)
     sprintf(dispBuff, "%.3f V", data_at_1k.adc_ac_out_Result.amplitude);
     LCD_ShowString(130, 145, 120, 12, 12, (uint8_t*)dispBuff);
 
-    // 频率显示 (fs:)
-    LCD_Fill(38, 175, 230, 187, WHITE);
+    // 输出频率显示 (fs:) - 应该与输入频率相同
+    LCD_Fill(60, 175, 230, 187, WHITE);
     LCD_Display_Frequency(data_at_1k.adc_ac_out_Result.frequency, 60, 175, DATA_COLOR);
 
     /* 输出直流部分 */
@@ -452,6 +462,15 @@ void Basic_Measurement_Page_Update(void)
     LCD_Fill(90, 235, 230, 247, WHITE);
     sprintf(dispBuff, "%.3f V", data_at_1k.adc_dc_out_Result);  // 修正：去掉.amplitude
     LCD_ShowString(90, 235, 120, 12, 12, (uint8_t*)dispBuff);
+    
+    /* 输出阻抗部分 - 仅在measure_r_out_flag为0时显示空白 */
+    if(measure_r_out_flag == 0)
+    {
+        // 清除输出阻抗显示区域，不显示数值
+        LCD_Fill(60, 190, 230, 202, WHITE);
+        LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)"--- kΩ");  // 显示占位符
+    }
+    // 注意：当measure_r_out_flag==1时，输出阻抗会在Basic_Measurement函数中通过DisplayRout函数显示
 }
 
 /**
@@ -459,6 +478,8 @@ void Basic_Measurement_Page_Update(void)
  */
 static void DisplayRout(float Rout)
 {
+    char dispBuff[48];  // 局部字符串缓冲区
+    
     // 设置显示颜色
     POINT_COLOR = DATA_COLOR;
     BACK_COLOR = WHITE;
@@ -469,6 +490,322 @@ static void DisplayRout(float Rout)
     // 格式化并显示输出阻抗
     sprintf(dispBuff, "%.3f kΩ", Rout);
     LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)dispBuff);
+}
+
+
+/* ============ 扫频测量部分 ============ */
+
+/**
+ * @brief 自动频幅特性测量主函数
+ */
+void Auto_Frequency_Response_Measurement(void)
+{
+    static uint8_t first_refresh = 1;  // 控制扫频测量页面初始刷新
+    
+    // 检测是否从其他模式切换回来，如果是则重新开始测量
+    if(current_system_state == SWEEP_FREQ_RESPONSE_STATE && last_sweep_mode_state == 0)
+    {
+        first_refresh = 1;  // 触发重新初始化
+    }
+    last_sweep_mode_state = (current_system_state == SWEEP_FREQ_RESPONSE_STATE) ? 1 : 0;  // 更新模式状态记录
+    
+    if(first_refresh)
+    {
+        // 初始化页面显示
+        LCD_Clear(WHITE);
+        LCD_Display_Title_Center("Frequency Response", 10);
+        Draw_Coordinate_System();
+        
+        first_refresh = 0;
+        measurement_complete = 0;  // 重置测量完成标志
+        current_point = 0;         // 重置测量点索引
+    }
+
+    // 如果测量还未完成，继续扫频测量
+    if (!measurement_complete && current_point < FREQ_POINTS)
+    {
+        // 计算当前频率点
+        float input_freq = Calculate_Log_Frequency(current_point);
+        
+        // 配置DDS到新频率
+        AD9851_Set_Frequency((uint32_t)input_freq);
+        
+        // 启动ADC+DMA+TIM系统到新频率，并获取实际采样率
+        float actual_fs = Start_ADC_DMA_TIM_System(input_freq);
+        
+        // 测量当前频率点，传入实际采样率
+        Measure_Single_Point(input_freq, &freq_response[current_point], actual_fs);
+        
+        // 绘制当前测量点
+        plot_Frequency_Response_Point(freq_response[current_point]);
+        
+        // 更新进度显示
+        Update_Measurement_Progress(current_point + 1, FREQ_POINTS);
+        
+        // 移动到下一个频率点
+        current_point++;
+        
+        // 检查是否完成所有测量
+        if (current_point >= FREQ_POINTS)
+        {
+            measurement_complete = 1;
+            
+            // 找出-3dB频点并显示
+            float freq_3db = Find_3dB_Frequency(freq_response, FREQ_POINTS);
+            Display_3dB_Frequency(freq_3db);
+            
+            // 显示测量统计信息
+            Display_Measurement_Statistics(freq_response, FREQ_POINTS);
+        }
+    }
+}
+
+/* ====== 数据处理部分 ====== */
+
+/**
+ * @brief 测量单个频率点的响应
+ * @param frequency 测量频率
+ * @param result 测量结果存储
+ * @param fs 实际采样频率
+ */
+static void Measure_Single_Point(float frequency, FreqResponse_t* result, float fs)
+{
+    static SignalAnalysisResult_t single_result;
+    
+    // 等待新的ADC数据
+    uint8_t data_ready = 0;
+    uint32_t timeout = 0;
+    while (!data_ready && timeout < 1000)
+    {
+        data_ready = Process_ADC_Data_F32(&single_result.adc_in_Result, 
+                                         &single_result.adc_ac_out_Result, 
+                                         &single_result.adc_dc_out_Result, fs);
+        if (!data_ready)
+        {
+            HAL_Delay(10);
+            timeout += 10;
+        }
+    }
+    
+    if (data_ready)
+    {
+        // 存储测量结果
+        result->frequency = frequency;
+        result->input_amp = single_result.adc_in_Result.amplitude;
+        result->output_amp = single_result.adc_ac_out_Result.amplitude;
+        
+        // 计算增益(dB)
+        if (result->input_amp > 0.001f)
+        {
+            result->gain_db = 20.0f * log10f(result->output_amp / result->input_amp);
+        }
+        else
+        {
+            result->gain_db = -100.0f;  // 极小值
+        }
+        
+        // 相位计算(简化处理)
+        result->phase_deg = 0.0f;
+    }
+    else
+    {
+        // 超时情况下的默认值
+        result->frequency = frequency;
+        result->input_amp = 0.0f;
+        result->output_amp = 0.0f;
+        result->gain_db = -100.0f;
+        result->phase_deg = 0.0f;
+    }
+}
+
+/**
+ * @brief 计算对数分布的频率点
+ * @param point_index 频率点索引 (0 到 FREQ_POINTS-1)
+ * @retval 对应的频率值 (Hz)
+ */
+static float Calculate_Log_Frequency(uint8_t point_index)
+{
+    if (point_index >= FREQ_POINTS) {
+        return FREQ_STOP;
+    }
+    
+    // 对数分布：freq = FREQ_START * (FREQ_STOP/FREQ_START)^(index/(FREQ_POINTS-1))
+    float log_ratio = (float)point_index / (float)(FREQ_POINTS - 1);
+    float frequency = FREQ_START * powf(FREQ_STOP / FREQ_START, log_ratio);
+    
+    return frequency;
+}
+
+/**
+ * @brief 查找-3dB频点
+ * @param freq_response 频率响应数据数组
+ * @param len 数组长度
+ * @retval -3dB频点，如果未找到返回0
+ */
+static float Find_3dB_Frequency(FreqResponse_t* freq_response, int len)
+{
+    if (len < 2) return 0.0f;
+    
+    // 找到最大增益
+    float max_gain = -100.0f;
+    for (int i = 0; i < len; i++) {
+        if (freq_response[i].gain_db > max_gain) {
+            max_gain = freq_response[i].gain_db;
+        }
+    }
+    
+    // 计算-3dB目标值
+    float target_gain = max_gain - 3.0f;
+    
+    // 查找第一个低于-3dB点的频率
+    for (int i = 0; i < len; i++) {
+        if (freq_response[i].gain_db < target_gain) {
+            return freq_response[i].frequency;
+        }
+    }
+    
+    return 0.0f;  // 未找到
+}
+
+
+
+/**
+ * @brief 更新测量进度显示
+ * @param current_point 当前测量点
+ * @param total_points 总测量点数
+ */
+static void Update_Measurement_Progress(uint8_t current_point, uint8_t total_points)
+{
+    char progress_text[30];
+    sprintf(progress_text, "Progress: %d/%d", current_point, total_points);
+    
+    // 设置显示位置和颜色
+    POINT_COLOR = BLUE;
+    BACK_COLOR = WHITE;
+    
+    // 清除进度显示区域
+    LCD_Fill(10, 25, 200, 35, WHITE);
+    
+    // 显示进度信息
+    LCD_ShowString(10, 25, 180, 12, 12, (uint8_t*)progress_text);
+}
+
+/**
+ * @brief 绘制完整的坐标系统
+ */
+static void Draw_Coordinate_System(void)
+{
+    // 定义绘图区域
+    uint16_t plot_x_start = 30;
+    uint16_t plot_x_end = 210;
+    uint16_t plot_y_start = 40;
+    uint16_t plot_y_end = 180;
+    
+    // 设置绘图颜色
+    POINT_COLOR = BLACK;
+    
+    // 绘制坐标轴
+    LCD_DrawLine(plot_x_start, plot_y_end, plot_x_end, plot_y_end);    // X轴
+    LCD_DrawLine(plot_x_start, plot_y_start, plot_x_start, plot_y_end); // Y轴
+    
+    // 绘制X轴刻度和标签(对数刻度)
+    float log_min = log10f(FREQ_START);     // log10(100) = 2.0
+    float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
+    
+    // 主要刻度点: 100Hz, 1kHz, 10kHz, 100kHz
+    float major_freqs[] = {100.0f, 1000.0f, 10000.0f, 100000.0f};
+    char* major_labels[] = {"100", "1k", "10k", "100k"};
+    
+    for(int i = 0; i < 4; i++)
+    {
+        if(major_freqs[i] >= FREQ_START && major_freqs[i] <= FREQ_STOP)
+        {
+            float log_freq = log10f(major_freqs[i]);
+            uint16_t x_pos = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
+            
+            // 绘制刻度线
+            LCD_DrawLine(x_pos, plot_y_end, x_pos, plot_y_end - 5);
+            
+            // 绘制标签
+            POINT_COLOR = BLACK;
+            BACK_COLOR = WHITE;
+            LCD_ShowString(x_pos - 10, plot_y_end + 5, 30, 12, 12, (uint8_t*)major_labels[i]);
+        }
+    }
+    
+    // 绘制Y轴刻度和标签(增益dB)
+    int16_t gain_range[] = {-40, -20, 0, 20};
+    char gain_labels[][5] = {"-40", "-20", "0", "+20"};
+    
+    for(int i = 0; i < 4; i++)
+    {
+        // 假设增益范围为-50dB到+30dB
+        uint16_t y_pos = plot_y_end - (gain_range[i] + 50) * (plot_y_end - plot_y_start) / 80;
+        
+        if(y_pos >= plot_y_start && y_pos <= plot_y_end)
+        {
+            // 绘制刻度线
+            LCD_DrawLine(plot_x_start, y_pos, plot_x_start + 5, y_pos);
+            
+            // 绘制标签
+            POINT_COLOR = BLACK;
+            BACK_COLOR = WHITE;
+            LCD_ShowString(5, y_pos - 6, 25, 12, 12, (uint8_t*)gain_labels[i]);
+        }
+    }
+    
+    // 绘制坐标轴标题
+    POINT_COLOR = BLACK;
+    BACK_COLOR = WHITE;
+    LCD_ShowString(plot_x_start + 60, plot_y_end + 20, 80, 12, 12, (uint8_t*)"Frequency");
+    
+    // 旋转文字较复杂，先用简单的Y轴标题
+    LCD_ShowString(5, plot_y_start + 50, 20, 12, 12, (uint8_t*)"dB");
+}
+
+/**
+ * @brief 绘制单个频率响应数据点
+ * @param point 频率响应数据点
+ */
+void plot_Frequency_Response_Point(FreqResponse_t point)
+{
+    // 定义绘图区域(与坐标系保持一致)
+    uint16_t plot_x_start = 30;
+    uint16_t plot_x_end = 210;
+    uint16_t plot_y_start = 40;
+    uint16_t plot_y_end = 180;
+    
+    // 计算对数频率坐标
+    float log_min = log10f(FREQ_START);
+    float log_max = log10f(FREQ_STOP);
+    float log_freq = log10f(point.frequency);
+    
+    // 计算X坐标
+    uint16_t x_pos = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
+    
+    // 计算Y坐标(增益范围-50dB到+30dB)
+    float gain_min = -50.0f;
+    float gain_max = 30.0f;
+    uint16_t y_pos = plot_y_end - (point.gain_db - gain_min) * (plot_y_end - plot_y_start) / (gain_max - gain_min);
+    
+    // 边界检查
+    if(x_pos >= plot_x_start && x_pos <= plot_x_end && 
+       y_pos >= plot_y_start && y_pos <= plot_y_end)
+    {
+        // 设置绘图颜色
+        POINT_COLOR = RED;
+        
+        // 绘制数据点(十字标记)
+        LCD_DrawLine(x_pos - 2, y_pos, x_pos + 2, y_pos);    // 水平线
+        LCD_DrawLine(x_pos, y_pos - 2, x_pos, y_pos + 2);    // 垂直线
+        
+        // 绘制小圆点
+        LCD_DrawPoint(x_pos, y_pos);
+        LCD_DrawPoint(x_pos + 1, y_pos);
+        LCD_DrawPoint(x_pos - 1, y_pos);
+        LCD_DrawPoint(x_pos, y_pos + 1);
+        LCD_DrawPoint(x_pos, y_pos - 1);
+    }
 }
 
 /**
@@ -627,403 +964,45 @@ static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, i
 }
 
 
-/* ============ 扫频测量部分 ============ */
-
+/* ===== 系统控制函数 ===== */
 /**
- * @brief 自动频幅特性测量主函数
+ * @brief 启动ADC+DMA+TIM系统
+ * @param frequency 目标测量频率（Hz）
+ * @retval 实际采样频率
  */
-void Auto_Frequency_Response_Measurement(void)
+float Start_ADC_DMA_TIM_System(float frequency)
 {
-    if(first_fresh2)
+    // 1. 停止可能正在运行的ADC和定时器
+    HAL_ADC_Stop_DMA(&hadc1);
+    HAL_TIM_Base_Stop(&htim2);
+    
+    // 2. 配置定时器到目标频率对应的采样率，并获取实际采样率
+    float actual_fs = Tim2_Config_AutoFs(frequency);
+    
+    // 3. 启动定时器
+    HAL_TIM_Base_Start(&htim2);
+    
+    // 4. 启动ADC+DMA
+    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
+    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, BUF_SIZE) != HAL_OK)
     {
-        // 初始化页面显示
-        Sweep_Freq_Response_Page_Init();
-        
-        // 初始化测量参数
-        static uint8_t cnt = 0;
-        static FreqResponse_t freq_response[FREQ_POINTS];
-
-        for(uint8_t i = 0; i < FREQ_POINTS; i++)
-        {       
-            // 输入特定频率
-            static SignalAnalysisResult_t single_result;
-            float input_freq =  Calculate_Log_Frequency(i);  // 计算每个bin对应的频率
-            float fs =  Tim2_Config_AutoFs(input_freq);  // 配置时基单元
-            Set_DDS_Frequency(input_freq);
-
-            // 延时至稳定
-            HAL_Delay(500);
-
-            // 数据处理
-            Process_ADC_Data_F32(&single_result.adc_in_Result, &single_result.adc_ac_out_Result, &single_result.adc_dc_out_Result, fs);
-
-            // 测量单点频率响应
-
-            float input_amp = single_result.adc_in_Result.amplitude;  // 输入幅度
-            float output_amp = single_result.adc_ac_out_Result.amplitude;  // 输出幅度
-
-            // 除零保护
-            if(input_amp > 0.001f)  // 避免除零，设置最小阈值
-            {
-                float gain_db = 20.0f * log10f(output_amp / input_amp);  // 计算增益(dB)
-            }
-            else
-            {
-                float gain_db = -100.0f;  // 输入过小时设置为最小增益
-            }
-
-            freq_response[i].frequency = input_freq;  // 记录频率
-            freq_response[i].input_amp = input_amp;  // 记录输入幅度
-            freq_response[i].output_amp = output_amp;  // 记录输出幅度
-            freq_response[i].gain_db = gain_db;  // 记录增益(dB)
-            freq_response[i].phase_deg = 0.0f;  // 相位暂时设置为0
-            
-            // 绘制数据点
-            plot_Frequency_Response_Point(freq_response[i]);
-        }
-
-        // 查找-3dB频点
-        float 3db_freq = Find_3dB_Frequency(freq_response, FREQ_POINTS);
-
-        // 连接各个数据点显示频率响应曲线 
-        Draw_Frequency_Response_Points(freq_response);
-
-        // 截止频率显示
-        Display_3dB_Frequency(3db_freq);
-
-        //  重制标志位
-        first_fresh1 = 1;
-        first_fresh2 = 0;
+        Error_Handler();
     }
-
-}
-
-/* ====== 数据处理部分 ====== */
-/**
- * @brief 计算对数扫频第i个bin对应的频率
- * @param uint8_t point_index: 第i个bin
- * @retval float: 对应的频率值（Hz）
- */
-static float Calculate_Log_Frequency(uint8_t point_index)
-{
-    // 对数扫频：频率按对数分布
-    float log_start = log10f(FREQ_START);   
-    float log_stop = log10f(FREQ_STOP);
-    float log_step = (log_stop - log_start) / (FREQ_POINTS - 1);
     
-    float log_freq = log_start + point_index * log_step;
-    return powf(10.0f, log_freq);   
+    // 5. 返回实际采样率
+    return actual_fs;
 }
 
 /**
- * @brief 设置DDS输出频率
- * @param 输入频率(单位Hz)
- */
-void Set_DDS_Frequency(float frequency)
-{   
-    // 调用AD9851设置频率
-    AD9851_Set_Frequency((uint32_t)frequency);
-    
-}
-
-/**
- * @brief 从频率响应数组中找出-3dB的频点
- * @param freq_response 频率响应数组指针
- * @param len 数组长度
- * @return float 返回-3dB频点，如果未找到返回-1.0f
- */
-float Find_3dB_Frequency(FreqResponse_t* freq_response, int len) {
-    if (freq_response == NULL || len <= 0) {
-        return -1.0f;  // 无效输入
-    }
-    
-    // 找到最大增益值
-    float max_gain = freq_response[0].gain_db;
-    for (int i = 1; i < len; i++) {
-        if (freq_response[i].gain_db > max_gain) {
-            max_gain = freq_response[i].gain_db;
-        }
-    }
-    
-    // 计算-3dB目标值
-    float target_gain = max_gain - 3.0f;
-    
-    // 从低频向高频搜索第一个小于等于-3dB的点
-    for (int i = 0; i < len - 1; i++) {
-        if (freq_response[i].gain_db > target_gain && 
-            freq_response[i + 1].gain_db <= target_gain) {
-            
-            // 线性插值计算精确的-3dB频点
-            float freq1 = freq_response[i].frequency;
-            float freq2 = freq_response[i + 1].frequency;
-            float gain1 = freq_response[i].gain_db;
-            float gain2 = freq_response[i + 1].gain_db;
-            
-            // 插值公式
-            float freq_3db = freq1 + (target_gain - gain1) * (freq2 - freq1) / (gain2 - gain1);
-            
-            return freq_3db;
-        }
-    }
-    
-    return -1.0f;  // 未找到-3dB点
-}
-
-/* ====== 图像显示部分 ====== */
-
-/**
- * @brief 扫频响应页面初始化函数
- * @details 该函数用于初始化扫频测量页面的显示界面，包括：
- *          - 清空屏幕
- *          - 显示页面标题
- *          - 绘制坐标系统
- * @param None
+ * @brief 停止ADC+DMA+TIM系统
  * @retval None
  */
-void Sweep_Freq_Response_Page_Init(void)
+void Stop_ADC_DMA_TIM_System(void)
 {
-    // 清空LCD屏幕, 设置为白色背景
-    LCD_Clear(WHITE);
-
-    // 设置标题显示颜色
-    POINT_COLOR = TITLE_COLOR;      // 设置字体颜色为标题色
-    BACK_COLOR = WHITE;             // 设置背景色为白色
-    
-    // 在屏幕顶部居中显示页面标题
-    LCD_Display_Title_Center("Sweep Frequency Response", 10);
-
-    // 绘制频率响应图的坐标系统
-    // 包括X轴(频率轴)、Y轴(增益轴)、刻度线和标签
-    Draw_Coordinate_System();
+    HAL_ADC_Stop_DMA(&hadc1);
+    HAL_TIM_Base_Stop(&htim2);
+    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
 }
 
-/**
- * @brief 绘制坐标系
- */
-static void Draw_Coordinate_System(void)
-{
-    // 定义绘图区域
-    uint16_t plot_x_start = 30;
-    uint16_t plot_x_end = 210;    // 调整右边界，为标签留出空间
-    uint16_t plot_y_start = 40;
-    uint16_t plot_y_end = 180;
-    
-    // 绘制坐标轴
-    POINT_COLOR = WHITE;
-    
-    // X轴 (频率轴) - 在底部
-    LCD_DrawLine(plot_x_start, plot_y_end, plot_x_end, plot_y_end);
-    // X轴箭头 (右箭头)
-    LCD_DrawLine(plot_x_end, plot_y_end, plot_x_end-ARROW_SIZE, plot_y_end-ARROW_SIZE/2);  // 上斜线
-    LCD_DrawLine(plot_x_end, plot_y_end, plot_x_end-ARROW_SIZE, plot_y_end+ARROW_SIZE/2);  // 下斜线
-
-    // Y轴 (增益轴) - 从底部到顶部
-    LCD_DrawLine(plot_x_start, plot_y_start, plot_x_start, plot_y_end);
-    // Y轴箭头 (上箭头)
-    LCD_DrawLine(plot_x_start, plot_y_start, plot_x_start-ARROW_SIZE/2, plot_y_start+ARROW_SIZE);  // 左斜线
-    LCD_DrawLine(plot_x_start, plot_y_start, plot_x_start+ARROW_SIZE/2, plot_y_start+ARROW_SIZE);  // 右斜线
-
-    // 绘制刻度线和标签
-    char label[20];
-    
-    // 频率刻度 (对数刻度) - 在X轴上
-    // 横轴范围：100Hz到200kHz，标签点：100Hz, 1kHz, 10kHz, 100kHz
-    POINT_COLOR = WHITE;
-    
-    // 定义频率标签点
-    float freq_labels[] = {100.0f, 1000.0f, 10000.0f, 100000.0f};  // 100Hz, 1kHz, 10kHz, 100kHz
-    uint8_t num_labels = 4;
-    
-    // 计算对数范围
-    float log_min = log10f(FREQ_START);     // log10(100) = 2.0
-    float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
-    
-    for(uint8_t i = 0; i < num_labels; i++)
-    {
-        // 计算每个标签点在对数刻度上的位置
-        float log_freq = log10f(freq_labels[i]);
-        uint16_t x = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
-        
-        // 绘制刻度线
-        LCD_DrawLine(x, plot_y_end-3, x, plot_y_end+3);
-        
-        // 格式化频率标签
-        if(freq_labels[i] < 1000)
-            sprintf(label, "%.0f", freq_labels[i]);          // 100
-        else if (freq_labels[i] < 1000000)
-            sprintf(label, "%.0fk", freq_labels[i]/1000.0f); // 1k, 10k, 100k
-        else
-            sprintf(label, "%.0fM", freq_labels[i]/1000000.0f);
-        
-        // 标签在X轴下方，使用12号字体
-        POINT_COLOR = WHITE;
-        BACK_COLOR = BLACK;
-        LCD_ShowString(x-12, plot_y_end+8, 24, 12, 12, (uint8_t*)label);
-    }
-    
-    // 增益刻度 - 在Y轴上
-    for(int8_t i = -3; i <= 3; i++)
-    {
-        // Y坐标计算：从上到下对应+30dB到-30dB
-        uint16_t y = plot_y_end - (i + 3) * (plot_y_end - plot_y_start) / 6;
-        int16_t gain_db = (3 - i) * 10;  // +30dB to -30dB (从上到下)
-        
-        // 刻度线在Y轴上
-        POINT_COLOR = WHITE;
-        LCD_DrawLine(plot_x_start-3, y, plot_x_start+3, y);
-        
-        // 格式化增益标签
-        sprintf(label, "%+d", gain_db);
-        
-        // 标签在Y轴左侧，使用12号字体
-        POINT_COLOR = WHITE;
-        BACK_COLOR = BLACK;
-        LCD_ShowString(5, y-6, 20, 12, 12, (uint8_t*)label);
-    }
-    
-    // 绘制网格线（可选）
-    POINT_COLOR = GRAY;
-    for(uint8_t i = 1; i <= 3; i++)  // 绘制水平网格线
-    {
-        uint16_t x = plot_x_start + i * (plot_x_end - plot_x_start) / 4;
-        LCD_DrawLine(x, plot_y_start, x, plot_y_end);
-    }
-    
-    for(int8_t i = -2; i <= 2; i++)  // 绘制垂直网格线
-    {
-        uint16_t y = plot_y_end - (i + 3) * (plot_y_end - plot_y_start) / 6;
-        LCD_DrawLine(plot_x_start, y, plot_x_end, y);
-    }
-    
-    // 添加坐标轴标签
-    POINT_COLOR = CYAN;
-    BACK_COLOR = BLACK;
-    LCD_ShowString(plot_x_end-40, plot_y_end+25, 80, 16, 16, (uint8_t*)"Freq(Hz)");  // X轴标签
-    LCD_ShowString(5, plot_y_start-20, 80, 16, 16, (uint8_t*)"Gain(dB)");            // Y轴标签
-}
-
-/**
- * @brief 绘制频率响应曲线（连接所有数据点）
- * @param freq_response_data 频率响应数据数组指针
- * @retval None
- */
-static void Draw_Frequency_Response_Points(FreqResponse_t* freq_response_data)
-{
-    // 定义绘图区域（与Draw_Coordinate_System中保持一致）
-    uint16_t plot_x_start = 30;
-    uint16_t plot_x_end = 210;
-    uint16_t plot_y_start = 40;
-    uint16_t plot_y_end = 180;
-    
-    // 计算对数范围
-    float log_min = log10f(FREQ_START);     // log10(100) = 2.0
-    float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
-    
-    // 设置曲线颜色
-    POINT_COLOR = RED;
-    
-    // 存储前一个点的坐标
-    uint16_t prev_x = 0, prev_y = 0;
-    uint8_t first_valid_point = 1;
-    
-    for(uint8_t i = 0; i < FREQ_POINTS; i++)
-    {
-        // 检查数据有效性
-        if(freq_response_data[i].frequency <= 0) continue;
-        
-        // 计算X坐标 (对数刻度)
-        float log_freq = log10f(freq_response_data[i].frequency);
-        uint16_t x = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
-        
-        // 计算Y坐标 (增益刻度: -30dB to +30dB)
-        float gain_clamped = freq_response_data[i].gain_db;
-        if(gain_clamped > 30.0f) gain_clamped = 30.0f;      // 限制上限
-        if(gain_clamped < -30.0f) gain_clamped = -30.0f;    // 限制下限
-        
-        uint16_t y = plot_y_end - (gain_clamped + 30.0f) * (plot_y_end - plot_y_start) / 60.0f;
-        
-        // 检查坐标是否在绘图区域内
-        if(x >= plot_x_start && x <= plot_x_end && y >= plot_y_start && y <= plot_y_end)
-        {
-            // 绘制数据点标记
-            LCD_DrawLine(x - 2, y, x + 2, y);    // 水平线
-            LCD_DrawLine(x, y - 2, x, y + 2);    // 垂直线
-            
-            // 绘制小圆点
-            LCD_Fast_DrawPoint(x, y, RED);
-            LCD_Fast_DrawPoint(x-1, y, RED);
-            LCD_Fast_DrawPoint(x+1, y, RED);
-            LCD_Fast_DrawPoint(x, y-1, RED);
-            LCD_Fast_DrawPoint(x, y+1, RED);
-            
-            // 连接到前一个点（如果不是第一个有效点）
-            if(!first_valid_point)
-            {
-                // 检查前一个点是否也在有效范围内
-                if(prev_x >= plot_x_start && prev_x <= plot_x_end && 
-                   prev_y >= plot_y_start && prev_y <= plot_y_end)
-                {
-                    // 绘制连接线
-                    LCD_DrawLine(prev_x, prev_y, x, y);
-                }
-            }
-            else
-            {
-                first_valid_point = 0;  // 标记已找到第一个有效点
-            }
-            
-            // 保存当前点坐标作为下一次的前一个点
-            prev_x = x;
-            prev_y = y;
-        }
-    }
-}
-
-/**
- * @brief 绘制单个频率响应数据点
- * @param point 频率响应数据点
- * @retval None
- */
-void plot_Frequency_Response_Point(FreqResponse_t point)
-{
-    // 定义绘图区域（与Draw_Coordinate_System中保持一致）
-    uint16_t plot_x_start = 30;
-    uint16_t plot_x_end = 210;
-    uint16_t plot_y_start = 40;
-    uint16_t plot_y_end = 180;
-    
-    // 计算对数范围
-    float log_min = log10f(FREQ_START);     // log10(100) = 2.0
-    float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
-    
-    // 计算X坐标 (对数刻度)
-    float log_freq = log10f(point.frequency);
-    uint16_t x = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
-    
-    // 计算Y坐标 (增益刻度: -30dB to +30dB)
-    float gain_clamped = point.gain_db;
-    if(gain_clamped > 30.0f) gain_clamped = 30.0f;      // 限制上限
-    if(gain_clamped < -30.0f) gain_clamped = -30.0f;    // 限制下限
-    
-    uint16_t y = plot_y_end - (gain_clamped + 30.0f) * (plot_y_end - plot_y_start) / 60.0f;
-    
-    // 检查坐标是否在绘图区域内
-    if(x >= plot_x_start && x <= plot_x_end && y >= plot_y_start && y <= plot_y_end)
-    {
-        // 设置数据点颜色
-        POINT_COLOR = RED;
-        
-        // 绘制数据点（十字形标记）
-        LCD_DrawLine(x - 2, y, x + 2, y);    // 水平线
-        LCD_DrawLine(x, y - 2, x, y + 2);    // 垂直线
-        
-        // 可选：绘制小圆点作为数据点
-        LCD_Fast_DrawPoint(x, y, RED);
-        LCD_Fast_DrawPoint(x-1, y, RED);
-        LCD_Fast_DrawPoint(x+1, y, RED);
-        LCD_Fast_DrawPoint(x, y-1, RED);
-        LCD_Fast_DrawPoint(x, y+1, RED);
-    }
-}
 
 
