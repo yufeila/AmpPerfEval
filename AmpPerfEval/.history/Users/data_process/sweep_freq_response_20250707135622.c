@@ -57,8 +57,6 @@ static void Draw_Frequency_Response_Points(void);
 static void Draw_Coordinate_System(void);
 static void Display_Measurement_Info(void);
 static void Update_Measurement_Progress(uint8_t current_point, uint8_t total_points);
-static void Display_3dB_Frequency(float freq_3db);  // 显示-3dB截止频率
-static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, int len);  // 显示测量统计信息
 void plot_Frequency_Response_Point(FreqResponse_t point);  // 绘制单个频率响应数据点
 
 /* ============ 基本测量部分 ============ */
@@ -486,8 +484,8 @@ static void Display_3dB_Frequency(float freq_3db)
     
     // 设置显示颜色
     POINT_COLOR = YELLOW;  // 黄色高亮显示
-    BACK_COLOR = WHITE;    // 白色背景
-
+    BACK_COLOR = BLACK;    // 黑色背景
+    
     // 检查频率是否有效
     if(freq_3db > 0)
     {

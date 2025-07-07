@@ -486,8 +486,8 @@ static void Display_3dB_Frequency(float freq_3db)
     
     // 设置显示颜色
     POINT_COLOR = YELLOW;  // 黄色高亮显示
-    BACK_COLOR = WHITE;    // 白色背景
-
+    BACK_COLOR = BLACK;    // 黑色背景
+    
     // 检查频率是否有效
     if(freq_3db > 0)
     {

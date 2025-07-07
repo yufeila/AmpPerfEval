@@ -44,8 +44,6 @@ void Basic_Measurement_Page_Init(void);
 void LCD_Display_Frequency(float frequency, uint16_t x, uint16_t y, uint16_t color);
 void Basic_Measurement_Page_Update(void);
 static void DisplayRout(float Rout);
-static void Display_3dB_Frequency(float freq_3db);
-static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, int len);
 
 
 /* ============ 扫频测量部分 ============ */
@@ -57,8 +55,6 @@ static void Draw_Frequency_Response_Points(void);
 static void Draw_Coordinate_System(void);
 static void Display_Measurement_Info(void);
 static void Update_Measurement_Progress(uint8_t current_point, uint8_t total_points);
-static void Display_3dB_Frequency(float freq_3db);  // 显示-3dB截止频率
-static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, int len);  // 显示测量统计信息
 void plot_Frequency_Response_Point(FreqResponse_t point);  // 绘制单个频率响应数据点
 
 /* ============ 基本测量部分 ============ */
@@ -471,161 +467,6 @@ static void DisplayRout(float Rout)
     LCD_ShowString(60, 190, 120, 12, 12, (uint8_t*)dispBuff);
 }
 
-/**
- * @brief 显示-3dB截止频率
- * @param freq_3db -3dB截止频率值（Hz）
- * @retval None
- */
-static void Display_3dB_Frequency(float freq_3db)
-{
-    char freq_display[30];
-    
-    // 设置显示位置（在图表下方）
-    uint16_t display_x = 10;
-    uint16_t display_y = 200;
-    
-    // 设置显示颜色
-    POINT_COLOR = YELLOW;  // 黄色高亮显示
-    BACK_COLOR = WHITE;    // 白色背景
-
-    // 检查频率是否有效
-    if(freq_3db > 0)
-    {
-        // 格式化频率显示
-        if(freq_3db >= 1000000.0f)  // MHz级别
-        {
-            sprintf(freq_display, "-3dB Freq: %.2f MHz", freq_3db / 1000000.0f);
-        }
-        else if(freq_3db >= 1000.0f)  // kHz级别
-        {
-            sprintf(freq_display, "-3dB Freq: %.2f kHz", freq_3db / 1000.0f);
-        }
-        else  // Hz级别
-        {
-            sprintf(freq_display, "-3dB Freq: %.1f Hz", freq_3db);
-        }
-    }
-    else
-    {
-        // 未找到-3dB频点
-        sprintf(freq_display, "-3dB Freq: Not Found");
-    }
-    
-    // 清除显示区域
-    LCD_Fill(display_x, display_y, 230, display_y + 16, WHITE);
-    
-    // 显示-3dB频率
-    LCD_ShowString(display_x, display_y, 220, 16, 16, (uint8_t*)freq_display);
-    
-    // 如果找到了有效的-3dB频点，在图上标记
-    if(freq_3db > 0)
-    {
-        // 定义绘图区域（与坐标系保持一致）
-        uint16_t plot_x_start = 30;
-        uint16_t plot_x_end = 210;
-        uint16_t plot_y_start = 40;
-        uint16_t plot_y_end = 180;
-        
-        // 计算对数范围
-        float log_min = log10f(FREQ_START);     // log10(100) = 2.0
-        float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
-        
-        // 计算-3dB频点在图上的X坐标
-        if(freq_3db >= FREQ_START && freq_3db <= FREQ_STOP)
-        {
-            float log_freq_3db = log10f(freq_3db);
-            uint16_t x_3db = plot_x_start + (log_freq_3db - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
-            
-            // 在图上绘制-3dB垂直标记线
-            POINT_COLOR = YELLOW;
-            for(uint16_t y = plot_y_start; y <= plot_y_end; y += 5)
-            {
-                // 绘制虚线
-                LCD_Fast_DrawPoint(x_3db, y, YELLOW);
-                LCD_Fast_DrawPoint(x_3db, y+1, YELLOW);
-            }
-            
-            // 在-3dB线上添加标记
-            uint16_t y_3db = plot_y_end - (3.0f + 30.0f) * (plot_y_end - plot_y_start) / 60.0f;  // -3dB对应的Y坐标
-            
-            // 绘制特殊标记（小圆圈）
-            POINT_COLOR = YELLOW;
-            LCD_DrawLine(x_3db - 3, y_3db, x_3db + 3, y_3db);     // 水平线
-            LCD_DrawLine(x_3db, y_3db - 3, x_3db, y_3db + 3);     // 垂直线
-            
-            // 绘制圆形标记
-            for(int i = -2; i <= 2; i++)
-            {
-                for(int j = -2; j <= 2; j++)
-                {
-                    if(i*i + j*j <= 4)  // 圆形范围
-                    {
-                        LCD_Fast_DrawPoint(x_3db + i, y_3db + j, YELLOW);
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * @brief 显示测量统计信息
- * @param freq_response_data 频率响应数据数组
- * @param len 数组长度
- * @retval None
- */
-static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, int len)
-{
-    char info_display[40];
-    
-    // 设置显示位置
-    uint16_t display_x = 10;
-    uint16_t display_y = 220;
-    
-    // 设置显示颜色
-    POINT_COLOR = CYAN;
-    BACK_COLOR = BLACK;
-    
-    // 找到最大增益和对应频率
-    float max_gain = -100.0f;
-    float max_gain_freq = 0.0f;
-    float min_gain = 100.0f;
-    
-    for(int i = 0; i < len; i++)
-    {
-        if(freq_response_data[i].frequency > 0)  // 有效数据
-        {
-            if(freq_response_data[i].gain_db > max_gain)
-            {
-                max_gain = freq_response_data[i].gain_db;
-                max_gain_freq = freq_response_data[i].frequency;
-            }
-            if(freq_response_data[i].gain_db < min_gain)
-            {
-                min_gain = freq_response_data[i].gain_db;
-            }
-        }
-    }
-    
-    // 清除显示区域
-    LCD_Fill(display_x, display_y, 230, display_y + 32, WHITE);
-    
-    // 显示峰值增益信息
-    if(max_gain_freq >= 1000.0f)
-    {
-        sprintf(info_display, "Peak: %.1fdB @ %.1fkHz", max_gain, max_gain_freq/1000.0f);
-    }
-    else
-    {
-        sprintf(info_display, "Peak: %.1fdB @ %.1fHz", max_gain, max_gain_freq);
-    }
-    LCD_ShowString(display_x, display_y, 220, 16, 12, (uint8_t*)info_display);
-    
-    // 显示动态范围
-    sprintf(info_display, "Range: %.1f ~ %.1f dB", min_gain, max_gain);
-    LCD_ShowString(display_x, display_y + 16, 220, 16, 12, (uint8_t*)info_display);
-}
-
 
 /* ============ 扫频测量部分 ============ */
 
@@ -689,7 +530,7 @@ void Auto_Frequency_Response_Measurement(void)
         Draw_Frequency_Response_Points(freq_response);
 
         // 截止频率显示
-        Display_3dB_Frequency(3db_freq);
+        Display_3dB_Frequency(freq_response, FREQ_POINTS);
 
         //  重制标志位
         first_fresh1 = 1;
@@ -900,83 +741,6 @@ static void Draw_Coordinate_System(void)
     BACK_COLOR = BLACK;
     LCD_ShowString(plot_x_end-40, plot_y_end+25, 80, 16, 16, (uint8_t*)"Freq(Hz)");  // X轴标签
     LCD_ShowString(5, plot_y_start-20, 80, 16, 16, (uint8_t*)"Gain(dB)");            // Y轴标签
-}
-
-/**
- * @brief 绘制频率响应曲线（连接所有数据点）
- * @param freq_response_data 频率响应数据数组指针
- * @retval None
- */
-static void Draw_Frequency_Response_Points(FreqResponse_t* freq_response_data)
-{
-    // 定义绘图区域（与Draw_Coordinate_System中保持一致）
-    uint16_t plot_x_start = 30;
-    uint16_t plot_x_end = 210;
-    uint16_t plot_y_start = 40;
-    uint16_t plot_y_end = 180;
-    
-    // 计算对数范围
-    float log_min = log10f(FREQ_START);     // log10(100) = 2.0
-    float log_max = log10f(FREQ_STOP);      // log10(200000) = 5.301
-    
-    // 设置曲线颜色
-    POINT_COLOR = RED;
-    
-    // 存储前一个点的坐标
-    uint16_t prev_x = 0, prev_y = 0;
-    uint8_t first_valid_point = 1;
-    
-    for(uint8_t i = 0; i < FREQ_POINTS; i++)
-    {
-        // 检查数据有效性
-        if(freq_response_data[i].frequency <= 0) continue;
-        
-        // 计算X坐标 (对数刻度)
-        float log_freq = log10f(freq_response_data[i].frequency);
-        uint16_t x = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
-        
-        // 计算Y坐标 (增益刻度: -30dB to +30dB)
-        float gain_clamped = freq_response_data[i].gain_db;
-        if(gain_clamped > 30.0f) gain_clamped = 30.0f;      // 限制上限
-        if(gain_clamped < -30.0f) gain_clamped = -30.0f;    // 限制下限
-        
-        uint16_t y = plot_y_end - (gain_clamped + 30.0f) * (plot_y_end - plot_y_start) / 60.0f;
-        
-        // 检查坐标是否在绘图区域内
-        if(x >= plot_x_start && x <= plot_x_end && y >= plot_y_start && y <= plot_y_end)
-        {
-            // 绘制数据点标记
-            LCD_DrawLine(x - 2, y, x + 2, y);    // 水平线
-            LCD_DrawLine(x, y - 2, x, y + 2);    // 垂直线
-            
-            // 绘制小圆点
-            LCD_Fast_DrawPoint(x, y, RED);
-            LCD_Fast_DrawPoint(x-1, y, RED);
-            LCD_Fast_DrawPoint(x+1, y, RED);
-            LCD_Fast_DrawPoint(x, y-1, RED);
-            LCD_Fast_DrawPoint(x, y+1, RED);
-            
-            // 连接到前一个点（如果不是第一个有效点）
-            if(!first_valid_point)
-            {
-                // 检查前一个点是否也在有效范围内
-                if(prev_x >= plot_x_start && prev_x <= plot_x_end && 
-                   prev_y >= plot_y_start && prev_y <= plot_y_end)
-                {
-                    // 绘制连接线
-                    LCD_DrawLine(prev_x, prev_y, x, y);
-                }
-            }
-            else
-            {
-                first_valid_point = 0;  // 标记已找到第一个有效点
-            }
-            
-            // 保存当前点坐标作为下一次的前一个点
-            prev_x = x;
-            prev_y = y;
-        }
-    }
 }
 
 /**
