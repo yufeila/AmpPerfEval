@@ -36,4 +36,5 @@ ampperfeval\bsp_ad9851.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_
 ampperfeval\bsp_ad9851.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h
 ampperfeval\bsp_ad9851.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 ampperfeval\bsp_ad9851.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
+ampperfeval\bsp_ad9851.o: ../Core/Inc/main.h
 ampperfeval\bsp_ad9851.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h

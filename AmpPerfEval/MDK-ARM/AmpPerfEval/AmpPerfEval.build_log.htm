@@ -27,12 +27,12 @@ Project File Date:  07/07/2025
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 7 (build 960)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
 Build target 'AmpPerfEval'
-compiling sweep_freq_response.c...
-..\Users\data_process\sweep_freq_response.c(63): warning:  #177-D: function "average_float_array"  was declared but never referenced
-  static float average_float_array(const float *arr, int N)
-..\Users\data_process\sweep_freq_response.c: 1 warning, 0 errors
+compiling bsp_ad9851.c...
+..\Users\ad9851\bsp_ad9851.c(159): warning:  #550-D: variable "freq_bytes"  was set but never used
+      uint8_t freq_bytes[4];
+..\Users\ad9851\bsp_ad9851.c: 1 warning, 0 errors
 linking...
-Program Size: Code=48916 RO-data=126944 RW-data=76 ZI-data=45804  
+Program Size: Code=49064 RO-data=126944 RW-data=80 ZI-data=45808  
 FromELF: creating hex file...
 "AmpPerfEval\AmpPerfEval.axf" - 0 Error(s), 1 Warning(s).
 
@@ -57,7 +57,7 @@ Package Vendor: Keil
 
    * Component: ARM::CMSIS:CORE@6.1.0
       Include file:  CMSIS/Core/Include/tz_context.h
-Build Time Elapsed:  00:00:08
+Build Time Elapsed:  00:00:07
 </pre>
 </body>
 </html>
