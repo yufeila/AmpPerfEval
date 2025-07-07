@@ -174,17 +174,17 @@ void ad9851_wr_parallel(uint8_t w0, double frequence)
     for(i = 0; i < 4; i++)
     {
         // 产生写时钟脉冲
-        digitalH(AD9851_W_CLK_PORT, AD9851_W_CLK_PIN);  // AD9851_W_CLK_Pin
-        digitalL(AD9851_W_CLK_PORT, AD9851_W_CLK_PIN);  // AD9851_W_CLK_Pin
+        digitalH(GPIOB, GPIO_PIN_6);  // AD9851_W_CLK_Pin
+        digitalL(GPIOB, GPIO_PIN_6);  // AD9851_W_CLK_Pin
     }
     
     // 发送W0控制字
-    digitalH(AD9851_W_CLK_PORT, AD9851_W_CLK_PIN);  // AD9851_W_CLK_Pin
-    digitalL(AD9851_W_CLK_PORT, AD9851_W_CLK_PIN);  // AD9851_W_CLK_Pin
+    digitalH(GPIOB, GPIO_PIN_6);  // AD9851_W_CLK_Pin
+    digitalL(GPIOB, GPIO_PIN_6);  // AD9851_W_CLK_Pin
 
     // fq_up信号：拉高->拉低，移入使能
-    digitalH(AD9851_FQ_UP_PORT, AD9851_FQ_UP_PIN);  // AD9851_FQ_UP_Pin
-    digitalL(AD9851_FQ_UP_PORT, AD9851_FQ_UP_PIN);  // AD9851_FQ_UP_Pin
+    digitalH(GPIOB, GPIO_PIN_7);  // AD9851_FQ_UP_Pin
+    digitalL(GPIOB, GPIO_PIN_7);  // AD9851_FQ_UP_Pin
 }
 
 
@@ -196,10 +196,10 @@ void ad9851_wr_parallel(uint8_t w0, double frequence)
 void AD9851_Init(uint8_t mode, uint8_t FD)
 {
     // GPIO配置已在MX_GPIO_Init()中完成，这里只需要初始化引脚状态
-    HAL_GPIO_WritePin(AD9851_W_CLK_PORT, AD9851_W_CLK_PIN, GPIO_PIN_RESET);  // AD9851_W_CLK_Pin
-    HAL_GPIO_WritePin(AD9851_FQ_UP_PORT, AD9851_FQ_UP_PIN, GPIO_PIN_RESET);  // AD9851_FQ_UP_Pin
-    HAL_GPIO_WritePin(AD9851_RESET_PORT, AD9851_RESET_PIN, GPIO_PIN_RESET);  // AD9851_RESET_Pin
-    HAL_GPIO_WritePin(AD9851_BIT_DATA_PORT, AD9851_BIT_DATA_PIN, GPIO_PIN_RESET);  // AD9851_BIT_DATA_Pin
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);  // AD9851_W_CLK_Pin
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);  // AD9851_FQ_UP_Pin
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);  // AD9851_RESET_Pin
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);  // AD9851_BIT_DATA_Pin
     
     // 根据模式选择复位方式
     if(mode == AD9851_SERIAL_MODE)
