@@ -19,13 +19,16 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "adc.h"
-#include "tim.h"
-#include <string.h>  // 用于strlen函数
 
 /* USER CODE BEGIN 0 */
 // ADC DMA缓冲区 - 使用volatile确保调试器可见性
 volatile uint16_t adc_buffer[BUF_SIZE] __attribute__((section(".bss")));
 volatile uint8_t ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE; 
+
+// 调试变量 - 供Keil Watch窗口查看
+volatile uint32_t debug_ch2_avg = 0, debug_ch4_avg = 0, debug_ch6_avg = 0;
+volatile uint32_t debug_ch2_range = 0, debug_ch4_range = 0, debug_ch6_range = 0;
+volatile uint32_t debug_buffer_ready_count = 0;
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;
@@ -220,128 +223,4 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
   }
 }
 
-/* 添加ADC数据采集测试函数 */
-void Test_ADC_Data_Collection(void)
-{
-    char debug_msg[200];
-    
-    // 串口输出开始信息
-    sprintf(debug_msg, "\r\n=== ADC Data Collection Test Start ===\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-    
-    // 清空缓冲区
-    for(int i = 0; i < BUF_SIZE; i++) {
-        adc_buffer[i] = 0;
-    }
-    
-    sprintf(debug_msg, "Buffer cleared. BUF_SIZE = %d\r\n", BUF_SIZE);
-    HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-    
-    // 启动一次ADC采集
-    ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
-    HAL_TIM_Base_Start(&htim2);
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, BUF_SIZE) == HAL_OK)
-    {
-        sprintf(debug_msg, "ADC+DMA started successfully\r\n");
-        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-        
-        // 等待采集完成
-        uint32_t timeout = 0;
-        while (ADC_BufferReadyFlag != BUFFER_READY_FLAG_FULL && timeout < 2000)
-        {
-            HAL_Delay(1);
-            timeout++;
-        }
-        
-        // 停止采集
-        HAL_ADC_Stop_DMA(&hadc1);
-        HAL_TIM_Base_Stop(&htim2);
-        
-        if(timeout >= 2000) {
-            sprintf(debug_msg, "ERROR: ADC collection timeout! ADC_BufferReadyFlag=%d\r\n", ADC_BufferReadyFlag);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            return;
-        }
-        
-        sprintf(debug_msg, "ADC collection completed in %lu ms\r\n", timeout);
-        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-        
-        // 分析数据
-        if(ADC_BufferReadyFlag == BUFFER_READY_FLAG_FULL) {
-            uint32_t sum_ch2 = 0, sum_ch4 = 0, sum_ch6 = 0;
-            uint32_t min_ch2 = 4095, min_ch4 = 4095, min_ch6 = 4095;
-            uint32_t max_ch2 = 0, max_ch4 = 0, max_ch6 = 0;
-            
-            // 先显示前10个原始数据
-            sprintf(debug_msg, "First 10 raw ADC values:\r\n");
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            for(int i = 0; i < 10 && (3*i+2) < BUF_SIZE; i++) {
-                sprintf(debug_msg, "[%d] CH2=%d, CH4=%d, CH6=%d\r\n", 
-                        i, adc_buffer[3*i], adc_buffer[3*i+1], adc_buffer[3*i+2]);
-                HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            }
-            
-            // 分析前300个采样点 (100组x3通道)
-            for(int i = 0; i < 100 && (3*i+2) < BUF_SIZE; i++) {
-                uint16_t val_ch2 = adc_buffer[3*i];
-                uint16_t val_ch4 = adc_buffer[3*i+1]; 
-                uint16_t val_ch6 = adc_buffer[3*i+2];
-                
-                sum_ch2 += val_ch2; sum_ch4 += val_ch4; sum_ch6 += val_ch6;
-                if(val_ch2 < min_ch2) min_ch2 = val_ch2; if(val_ch2 > max_ch2) max_ch2 = val_ch2;
-                if(val_ch4 < min_ch4) min_ch4 = val_ch4; if(val_ch4 > max_ch4) max_ch4 = val_ch4;
-                if(val_ch6 < min_ch6) min_ch6 = val_ch6; if(val_ch6 > max_ch6) max_ch6 = val_ch6;
-            }
-            
-            // 计算平均值和范围
-            uint32_t avg_ch2 = sum_ch2/100;
-            uint32_t avg_ch4 = sum_ch4/100;
-            uint32_t avg_ch6 = sum_ch6/100;
-            uint32_t range_ch2 = max_ch2 - min_ch2;
-            uint32_t range_ch4 = max_ch4 - min_ch4;
-            uint32_t range_ch6 = max_ch6 - min_ch6;
-            
-            // 串口输出统计结果
-            sprintf(debug_msg, "\r\n=== ADC Statistics (100 samples) ===\r\n");
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH2 (Input):  Min=%lu, Max=%lu, Avg=%lu, Range=%lu\r\n", 
-                    min_ch2, max_ch2, avg_ch2, range_ch2);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH4 (AC Out): Min=%lu, Max=%lu, Avg=%lu, Range=%lu\r\n", 
-                    min_ch4, max_ch4, avg_ch4, range_ch4);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH6 (DC Out): Min=%lu, Max=%lu, Avg=%lu, Range=%lu\r\n", 
-                    min_ch6, max_ch6, avg_ch6, range_ch6);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            // 电压转换显示
-            float vol_ch2 = avg_ch2 * 0.0008058f;
-            float vol_ch4 = avg_ch4 * 0.0008058f;
-            float vol_ch6 = avg_ch6 * 0.0008058f;
-            
-            sprintf(debug_msg, "\r\n=== Voltage Conversion ===\r\n");
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH2 (Input):  %.3fV\r\n", vol_ch2);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH4 (AC Out): %.3fV\r\n", vol_ch4);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "CH6 (DC Out): %.3fV\r\n", vol_ch6);
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-            
-            sprintf(debug_msg, "=== Test Completed ===\r\n\r\n");
-            HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-        }
-    }
-    else 
-    {
-        sprintf(debug_msg, "ERROR: Failed to start ADC+DMA\r\n");
-        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 1000);
-    }
-}
+/* USER CODE END 1 */

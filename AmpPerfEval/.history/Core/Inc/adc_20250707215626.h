@@ -27,8 +27,6 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "usart.h"  // 用于串口调试输出
-#include <stdio.h>  // 用于sprintf
 
 /* USER CODE BEGIN Includes */
 // 缓存区状态定义
@@ -46,6 +44,11 @@ extern ADC_HandleTypeDef hadc1;
 extern volatile uint16_t adc_buffer[BUF_SIZE];
 extern volatile uint8_t ADC_BufferReadyFlag;
 
+// 调试变量声明 - 供Keil Watch窗口查看
+extern volatile uint32_t debug_ch2_avg, debug_ch4_avg, debug_ch6_avg;
+extern volatile uint32_t debug_ch2_range, debug_ch4_range, debug_ch6_range;
+extern volatile uint32_t debug_buffer_ready_count;
+
 /* USER CODE BEGIN Private defines */
 #define Start_ADC_DMA   HAL_ADC_Start_DMA(&hadc1, adc_buffer, BUF_SIZE)
 /* USER CODE END Private defines */
@@ -53,8 +56,7 @@ extern volatile uint8_t ADC_BufferReadyFlag;
 void MX_ADC1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-// 添加ADC数据采集测试函数
-void Test_ADC_Data_Collection(void);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

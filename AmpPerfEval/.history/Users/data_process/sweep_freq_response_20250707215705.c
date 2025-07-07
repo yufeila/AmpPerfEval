@@ -1,9 +1,6 @@
-#include "sweep_freq_response.h"
-#include "usart.h"     // 用于串口调试
-#include <string.h>    // 用于strlen
-#include <stdio.h>     // 用于sprintf
-
 #include "./data_process/sweep_freq_response.h"
+#include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 //外部变量声明
@@ -228,11 +225,9 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
     
-    // 【调试代码】检查原始ADC数据 - 使用串口输出
+    // 【调试代码】检查原始ADC数据
     static uint32_t debug_counter = 0;
-    static char debug_msg[150];
-    
-    if(++debug_counter % 20 == 0) {  // 每20次调用输出一次，减少串口负载
+    if(++debug_counter % 10 == 0) {  // 每10次调用输出一次，避免刷屏
         uint32_t sum_ch2 = 0, sum_ch4 = 0, sum_ch6 = 0;
         uint32_t min_ch2 = 4095, min_ch4 = 4095, min_ch6 = 4095;
         uint32_t max_ch2 = 0, max_ch4 = 0, max_ch6 = 0;
@@ -249,14 +244,9 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
             if(val_ch6 < min_ch6) min_ch6 = val_ch6; if(val_ch6 > max_ch6) max_ch6 = val_ch6;
         }
         
-        // 计算平均值和范围
-        uint32_t avg_ch2 = sum_ch2/100, avg_ch4 = sum_ch4/100, avg_ch6 = sum_ch6/100;
-        uint32_t range_ch2 = max_ch2 - min_ch2, range_ch4 = max_ch4 - min_ch4, range_ch6 = max_ch6 - min_ch6;
-        
-        // 串口输出ADC数据统计
-        sprintf(debug_msg, "[ADC] CH2: %lu(%lu) CH4: %lu(%lu) CH6: %lu(%lu)\r\n", 
-                avg_ch2, range_ch2, avg_ch4, range_ch4, avg_ch6, range_ch6);
-        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 100);
+        // 更新全局调试变量供Keil Watch窗口查看
+        debug_ch2_avg = sum_ch2/100; debug_ch4_avg = sum_ch4/100; debug_ch6_avg = sum_ch6/100;
+        debug_ch2_range = max_ch2 - min_ch2; debug_ch4_range = max_ch4 - min_ch4; debug_ch6_range = max_ch6 - min_ch6;
     }
     
     // 5. 处理本轮采集的数据
