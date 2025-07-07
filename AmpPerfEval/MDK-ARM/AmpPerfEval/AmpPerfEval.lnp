@@ -4,7 +4,9 @@
 "ampperfeval\main.o"
 "ampperfeval\gpio.o"
 "ampperfeval\adc.o"
+"ampperfeval\dma.o"
 "ampperfeval\fsmc.o"
+"ampperfeval\tim.o"
 "ampperfeval\usart.o"
 "ampperfeval\stm32f4xx_it.o"
 "ampperfeval\stm32f4xx_hal_msp.o"
@@ -30,8 +32,12 @@
 "ampperfeval\stm32f4xx_hal_tim_ex.o"
 "ampperfeval\stm32f4xx_hal_uart.o"
 "ampperfeval\system_stm32f4xx.o"
-"..\Middlewares\ST\ARM\DSP\Lib\arm_cortexM4lf_math.lib"
 "ampperfeval\lcd.o"
+"ampperfeval\bsp_ad9851.o"
+"ampperfeval\sweep_freq_response.o"
+"ampperfeval\key.o"
+"ampperfeval\spectrum_analysis.o"
+"..\Middlewares\ST\ARM\DSP\Lib\arm_cortexM4lf_math.lib"
 --library_type=microlib --strict --scatter "AmpPerfEval\AmpPerfEval.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers

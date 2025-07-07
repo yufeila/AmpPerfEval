@@ -1,5 +1,5 @@
 ampperfeval\lcd.o: ..\Users\lcd\lcd.c
-ampperfeval\lcd.o: ..\Users\./lcd/lcd.h
+ampperfeval\lcd.o: ../Users/./lcd/lcd.h
 ampperfeval\lcd.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdlib.h
 ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h
 ampperfeval\lcd.o: ../Core/Inc/stm32f4xx_hal_conf.h
@@ -34,6 +34,8 @@ ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_sram.h
 ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_fsmc.h
 ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h
 ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h
+ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h
+ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 ampperfeval\lcd.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
 ampperfeval\lcd.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
 ampperfeval\lcd.o: ..\Users\lcd\font.h

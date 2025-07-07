@@ -5,8 +5,7 @@
 #include <math.h>  
 #include "tim.h"
 #include "./ad9851/bsp_ad9851.h"
-#include './spectrum_analysis/spectrum_analysis.h'
-#include "./spectrum_analysis/adaptive_fft.h"
+#include "./spectrum_analysis/spectrum_analysis.h"
 #include "./lcd/lcd.h"
 #include "./key/key.h"
 #include "adc.h"

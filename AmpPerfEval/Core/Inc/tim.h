@@ -36,8 +36,10 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+
 /* USER CODE BEGIN Includes */
 #include <math.h>
+#include "stm32f4xx_hal.h"
 /* USER CODE END Includes */
 
 extern TIM_HandleTypeDef htim2;
@@ -75,6 +77,15 @@ extern TIM_HandleTypeDef htim2;
 #define SAMPLING_RATE_STANDARD      400000U   // 400kHz，标准高速配置  
 #define SAMPLING_RATE_MAXIMUM       ((uint32_t)TIM_MAX_TRIGGER_FREQ)  // 理论最大值
 #define TIM_MAX_TRIGGER_FREQ (1000000.0f / ADC_SCAN_TIME_US)
+
+#ifndef __HAL_TIM_GET_PRESCALER
+#define __HAL_TIM_GET_PRESCALER(__HANDLE__) ((__HANDLE__)->Instance->PSC)
+#endif
+
+#ifndef __HAL_TIM_GET_AUTORELOAD
+#define __HAL_TIM_GET_AUTORELOAD(__HANDLE__) ((__HANDLE__)->Instance->ARR)
+#endif
+
 /* USER CODE END Private defines */
 
 void MX_TIM2_Init(void);

@@ -20,7 +20,6 @@
 #define RELAY_PIN GPIO_PIN_12
 #define RELAY_PORT GPIOB
 
-#define RELAY_ON HAL_GPIO_WritePin(RELAY_PORT, RELAY_PIN, GPIO_PIN_SET)
 
 // 系统状态定义
 #define BASIC_MEASUREMENT_STATE           1
