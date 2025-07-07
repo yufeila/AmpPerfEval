@@ -1070,23 +1070,17 @@ float Start_ADC_DMA_TIM_System(float frequency)
     // 2. 配置定时器到目标频率对应的采样率，并获取实际采样率
     float actual_fs = Tim2_Config_AutoFs(frequency);
     
-    // 3. 双重保护：确保采样率不会过低
-    if (actual_fs < 10000.0f) {
-        // 强制使用安全的采样率
-        actual_fs = Tim2_Config_AutoFs(20000.0f);  // 重新配置为20kHz
-    }
-    
-    // 4. 启动定时器
+    // 3. 启动定时器
     HAL_TIM_Base_Start(&htim2);
     
-    // 5. 启动ADC+DMA
+    // 4. 启动ADC+DMA
     ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
     if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, BUF_SIZE) != HAL_OK)
     {
         Error_Handler();
     }
     
-    // 6. 返回实际采样率
+    // 5. 返回实际采样率
     return actual_fs;
 }
 

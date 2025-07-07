@@ -208,28 +208,23 @@ float Tim2_Config_AutoFs(float f0_hz)
  * ----------------------------------------------------------*/
 float Tim2_Config_Channel_Fs(float target_fs)
 {
-    /* 1. 检查采样率下限 */
-    if (target_fs < SAMPLING_RATE_MIN) {
-        target_fs = SAMPLING_RATE_SAFE_MIN;  // 使用推荐的安全下限20kHz
-    }
-    
-    /* 2. 检查硬件约束 */
+    /* 1. 检查硬件约束 */
     if (target_fs > TIM_MAX_TRIGGER_FREQ) {
         target_fs = TIM_MAX_TRIGGER_FREQ;
     }
 
-    /* 3. 配置定时器触发频率 */
+    /* 2. 配置定时器触发频率 */
     tim2_set_fs((uint32_t)(target_fs + 0.5f));
 
-    /* 4. 计算实际采样率 */
+    /* 3. 计算实际采样率 */
     uint32_t actual_psc = __HAL_TIM_GET_PRESCALER(&htim2);
     uint32_t actual_arr = __HAL_TIM_GET_AUTORELOAD(&htim2);
     float actual_fs = (float)TIM_CLK_HZ / ((actual_psc + 1u) * (actual_arr + 1u));
 
-    /* 5. 更新全局变量供 FFT 使用 */
+    /* 4. 更新全局变量供 FFT 使用 */
     g_current_Fs = actual_fs;
 
-    /* 6. 返回实际采样率 */
+    /* 5. 返回实际采样率 */
     return actual_fs;
 }
 
