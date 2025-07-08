@@ -41,9 +41,9 @@
 #define DATA_COLOR              BLACK
 
 // 电路相关参数定义
-#define V_s                     20.0f //单位：mV
-#define V_Rs_Gain               106.0f
-#define R_s                     0.022f //单位：kΩ
+#define V_s                     20.8f //单位：mV
+#define V_Rs_Gain               110.0f
+#define R_s                     6.2f //单位：kΩ
 #define R_L                     570.0f   //单位：kΩ     
 
 typedef struct {

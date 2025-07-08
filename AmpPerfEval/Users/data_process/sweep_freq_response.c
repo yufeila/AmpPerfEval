@@ -182,7 +182,7 @@ void Basic_Measurement(void)
         measure_r_out_flag = 0;  // 清除测量触发标志位
         
         // 关闭继电器
-        RELAY_OFF;
+       //RELAY_OFF;
     }
 
 }
@@ -387,7 +387,7 @@ static float CalculateRout(SpectrumResult_t* v_out_with_load, SpectrumResult_t* 
  */
 static float CalculateRin(SignalAnalysisResult_t* res)
 {
-    float Rin = (V_s - res->adc_in_Result.amplitude/V_Rs_Gain)/(res->adc_in_Result.amplitude/V_Rs_Gain) * R_s;
+    float Rin = (V_s * 1e-3 * 0.5 - res->adc_in_Result.amplitude/V_Rs_Gain)/(res->adc_in_Result.amplitude/V_Rs_Gain) * R_s;
     return Rin;  // kΩ
 }
 /* ===== 硬件控制函数 ===== */
@@ -416,7 +416,7 @@ static void Force_Stop_All_Operations(void)
     ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
     
     // 关闭继电器（如果开启的话）
-    RELAY_OFF;
+    //RELAY_OFF;
 }
 
 
@@ -788,7 +788,7 @@ static void Measure_Single_Point(float frequency, FreqResponse_t* result, float 
         // 计算增益(dB)
         if (result->input_amp > 0.001f)
         {
-            result->gain_db = 20.0f * log10f(result->output_amp / result->input_amp);
+            result->gain_db = 20.0f * log10f(result->output_amp / ( V_s *1e-3 - result->input_amp/V_Rs_Gain ));
         }
         else
         {
@@ -857,9 +857,11 @@ static float Find_3dB_Frequency(FreqResponse_t* freq_response, int len)
     
     // 找到最大增益
     float max_gain = -100.0f;
+	uint8_t max_index = 0;
     for (int i = 0; i < len; i++) {
         if (freq_response[i].gain_db > max_gain) {
             max_gain = freq_response[i].gain_db;
+			max_index = i;
         }
     }
     
@@ -867,7 +869,7 @@ static float Find_3dB_Frequency(FreqResponse_t* freq_response, int len)
     float target_gain = max_gain - 3.0f;
     
     // 查找第一个低于-3dB点的频率
-    for (int i = 0; i < len; i++) {
+    for (int i = max_index; i < len; i++) {
         if (freq_response[i].gain_db < target_gain) {
             return freq_response[i].frequency;
         }
