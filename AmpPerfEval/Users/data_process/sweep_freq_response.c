@@ -14,6 +14,7 @@ extern uint8_t basic_measurement_flag;
 extern uint8_t sweep_freq_response_flag;
 extern uint8_t measure_r_out_flag;
 extern uint8_t current_system_state;
+extern DMA_HandleTypeDef hdma_adc1;
 
 // 全局变量声明
 /* 基本参数显示 */
@@ -212,6 +213,7 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     // 清除可能的DMA标志位
     __HAL_DMA_CLEAR_FLAG(&hdma_adc1, DMA_FLAG_TCIF0_4);
     
+	__HAL_TIM_SET_COUNTER(&htim2, htim2.Init.Period -1);
     // 再启动定时器触发，避免第一次TRGO丢失
     HAL_TIM_Base_Start(&htim2);
     
