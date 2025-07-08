@@ -308,8 +308,8 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
     
     // 1. 调用FFT分析
     spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
-
-    // 2. 结果有效性检查和滤波
+    
+    // 方案2：结果有效性检查和滤波
     bool result_valid = true;
     
     // 检查1：幅度应该在合理范围内 (0.01V ~ 5V) - 放宽下限

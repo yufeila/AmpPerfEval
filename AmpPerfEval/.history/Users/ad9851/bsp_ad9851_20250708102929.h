@@ -2,7 +2,7 @@
  * @Author: 杨宇菲 17786321727@163.com
  * @Date: 2025-06-30 15:51:28
  * @LastEditors: yyf 17786321727@163.com
- * @LastEditTime: 2025-07-08 10:32:44
+ * @LastEditTime: 2025-07-07 21:12:04
  * @FilePath: \AmpPerfEval\Users\ad9851\bsp_ad9851.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -23,14 +23,15 @@
 // GPIOB_PIN_7: AD9851_FQ_UP_Pin (频率更新)
 
 
-#define AD9851_W_CLK_PIN GPIO_PIN_6
-#define AD9851_W_CLK_GPIO_PORT GPIOB
-#define AD9851_FQ_UP_PIN GPIO_PIN_7
-#define AD9851_FQ_UP_GPIO_PORT GPIOB
-#define AD9851_RESET_PIN GPIO_PIN_4
-#define AD9851_RESET_GPIO_PORT GPIOB
-#define AD9851_BIT_DATA_PIN GPIO_PIN_5
-#define AD9851_BIT_DATA_GPIO_PORT GPIOB
+// 使用HAL库生成的引脚定义，确保与main.h中的定义一致
+#define AD9851_W_CLK_PIN AD9851_W_CLK_Pin
+#define AD9851_W_CLK_GPIO_PORT AD9851_W_CLK_GPIO_Port
+#define AD9851_FQ_UP_PIN AD9851_FQ_UP_Pin
+#define AD9851_FQ_UP_GPIO_PORT AD9851_FQ_UP_GPIO_Port
+#define AD9851_RESET_PIN AD9851_RESET_Pin
+#define AD9851_RESET_GPIO_PORT AD9851_RESET_GPIO_Port
+#define AD9851_BIT_DATA_PIN AD9851_BIT_DATA_Pin
+#define AD9851_BIT_DATA_GPIO_PORT AD9851_BIT_DATA_GPIO_Port
 
 
 /* GPIO Pin Definitions */
