@@ -1190,18 +1190,15 @@ float Start_ADC_DMA_TIM_System(float frequency)
         actual_fs = Tim2_Config_AutoFs(20000.0f);  // 重新配置为20kHz
     }
     
-    // 4. 启动ADC+DMA（先启动ADC+DMA）
+    // 4. 启动定时器
+    HAL_TIM_Base_Start(&htim2);
+    
+    // 5. 启动ADC+DMA
     ADC_BufferReadyFlag = BUFFER_READY_FLAG_NONE;
     if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, BUF_SIZE) != HAL_OK)
     {
         Error_Handler();
     }
-    
-    // 清除可能的DMA标志位
-    __HAL_DMA_CLEAR_FLAG(&hdma_adc1, DMA_FLAG_TCIF0_4);
-    
-    // 5. 启动定时器（后启动定时器触发）
-    HAL_TIM_Base_Start(&htim2);
     
     // 6. 返回实际采样率
     return actual_fs;
