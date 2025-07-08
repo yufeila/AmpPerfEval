@@ -243,9 +243,6 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
     
-    // 清除URS位，恢复默认行为
-    htim2.Instance->CR1 &= ~TIM_CR1_URS;
-    
     // 5. 处理本轮采集的数据
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];
     DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);

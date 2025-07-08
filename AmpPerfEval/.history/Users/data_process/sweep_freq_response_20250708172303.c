@@ -243,26 +243,9 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
     
-    // 清除URS位，恢复默认行为
-    htim2.Instance->CR1 &= ~TIM_CR1_URS;
-    
     // 5. 处理本轮采集的数据
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];
     DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
-    
-    // *** 调试输出：验证通道对齐 ***
-    // 采样前10个原始ADC值和分离后的电压值进行验证
-    if (current_system_state == SWEEP_FREQ_RESPONSE_STATE) {
-        printf("Raw ADC[0-8]: %d,%d,%d | %d,%d,%d | %d,%d,%d\r\n",
-               adc_buffer[0], adc_buffer[1], adc_buffer[2],
-               adc_buffer[3], adc_buffer[4], adc_buffer[5], 
-               adc_buffer[6], adc_buffer[7], adc_buffer[8]);
-        
-        printf("After Demux[0-2]: Vin=%.3f, Vout=%.3f, Vdc=%.3f\r\n",
-               adc_in_buffer[0] + (adc_in_buffer[0] + adc_in_buffer[1] + adc_in_buffer[2])/3.0f, // 恢复DC后的值
-               adc_ac_out_buffer[0] + (adc_ac_out_buffer[0] + adc_ac_out_buffer[1] + adc_ac_out_buffer[2])/3.0f,
-               adc_dc_out_buffer[0]);
-    }
     
     // 6. 分别处理3个子数组中的数据
     ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
