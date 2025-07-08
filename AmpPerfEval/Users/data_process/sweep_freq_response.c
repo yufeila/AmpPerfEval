@@ -138,7 +138,7 @@ void Basic_Measurement(void)
         AD9851_Set_Frequency(1000);
         
         // 只配置定时器，不启动ADC+DMA+TIM系统
-        current_fs = Tim2_Config_AutoFs(1000.0f);
+        current_fs = Tim2_Config_AutoFs(200000.0f);
         
         // 初始化屏幕显示
         Basic_Measurement_Page_Init();
@@ -250,19 +250,19 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];
     DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
     
-    // *** 调试输出：验证通道对齐 ***
-    // 采样前10个原始ADC值和分离后的电压值进行验证
-    if (current_system_state == SWEEP_FREQ_RESPONSE_STATE) {
-        printf("Raw ADC[0-8]: %d,%d,%d | %d,%d,%d | %d,%d,%d\r\n",
-               adc_buffer[0], adc_buffer[1], adc_buffer[2],
-               adc_buffer[3], adc_buffer[4], adc_buffer[5], 
-               adc_buffer[6], adc_buffer[7], adc_buffer[8]);
-        
-        printf("After Demux[0-2]: Vin=%.3f, Vout=%.3f, Vdc=%.3f\r\n",
-               adc_in_buffer[0] + (adc_in_buffer[0] + adc_in_buffer[1] + adc_in_buffer[2])/3.0f, // 恢复DC后的值
-               adc_ac_out_buffer[0] + (adc_ac_out_buffer[0] + adc_ac_out_buffer[1] + adc_ac_out_buffer[2])/3.0f,
-               adc_dc_out_buffer[0]);
-    }
+//    // *** 调试输出：验证通道对齐 ***
+//    // 采样前10个原始ADC值和分离后的电压值进行验证
+//    if (current_system_state == SWEEP_FREQ_RESPONSE_STATE) {
+//        printf("Raw ADC[0-8]: %d,%d,%d | %d,%d,%d | %d,%d,%d\r\n",
+//               adc_buffer[0], adc_buffer[1], adc_buffer[2],
+//               adc_buffer[3], adc_buffer[4], adc_buffer[5], 
+//               adc_buffer[6], adc_buffer[7], adc_buffer[8]);
+//        
+//        printf("After Demux[0-2]: Vin=%.3f, Vout=%.3f, Vdc=%.3f\r\n",
+//               adc_in_buffer[0] + (adc_in_buffer[0] + adc_in_buffer[1] + adc_in_buffer[2])/3.0f, // 恢复DC后的值
+//               adc_ac_out_buffer[0] + (adc_ac_out_buffer[0] + adc_ac_out_buffer[1] + adc_ac_out_buffer[2])/3.0f,
+//               adc_dc_out_buffer[0]);
+//    }
     
     // 6. 分别处理3个子数组中的数据
     ProcessSampleData_F32(adc_in_buffer, pRes1, fs);
@@ -335,7 +335,6 @@ static void CalcArrayMean(const float* buf, float *pRes)
  *----------------------------------------------------*/
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs)
 {
-    static SpectrumResult_t last_valid_result = {0.0f, 1000.0f, 0, 0.0f}; // 初始化为合理默认值
     
     // 1. 调用FFT分析
     spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
@@ -357,27 +356,8 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
             result_valid = false;
         }
         
-        // 检查3：如果有上次有效结果，新结果不应该变化太大（避免突变）
-        if(last_valid_result.amplitude > 0.005f) {
-            float amp_ratio = pRes->amplitude / last_valid_result.amplitude;
-            float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
-            
-            // 基本测量模式：幅度变化超过70%或频率变化超过200Hz认为异常
-            if(amp_ratio < 0.3f || amp_ratio > 5.0f || freq_diff > 200.0f) {
-                result_valid = false;
-            }
-        }
-        
-        if(result_valid) {
-            // 结果看起来合理，更新last_valid_result
-            last_valid_result = *pRes;
-        } else {
-            // 结果异常，使用上次有效结果
-            if(last_valid_result.amplitude > 0.005f) {
-                *pRes = last_valid_result;
-            }
-            // 如果没有有效的历史结果，保持当前结果
-        }
+
+ 
     } 
     else if(current_system_state == SWEEP_FREQ_RESPONSE_STATE) {
         // 扫频模式：完全禁用有效性检查，直接使用FFT原始结果
