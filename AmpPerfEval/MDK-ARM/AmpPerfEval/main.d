@@ -37,10 +37,11 @@ ampperfeval\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h
 ampperfeval\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 ampperfeval\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
 ampperfeval\main.o: ../Core/Inc/adc.h
+ampperfeval\main.o: ../Core/Inc/usart.h
+ampperfeval\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
 ampperfeval\main.o: ../Core/Inc/dma.h
 ampperfeval\main.o: ../Core/Inc/tim.h
 ampperfeval\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\math.h
-ampperfeval\main.o: ../Core/Inc/usart.h
 ampperfeval\main.o: ../Core/Inc/gpio.h
 ampperfeval\main.o: ../Core/Inc/fsmc.h
 ampperfeval\main.o: ../Users/./lcd/lcd.h

@@ -1,5 +1,5 @@
 ampperfeval\sweep_freq_response.o: ..\Users\data_process\sweep_freq_response.c
-ampperfeval\sweep_freq_response.o: ../Users/./data_process/sweep_freq_response.h
+ampperfeval\sweep_freq_response.o: ..\Users\data_process\sweep_freq_response.h
 ampperfeval\sweep_freq_response.o: ../Core/Inc/main.h
 ampperfeval\sweep_freq_response.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h
 ampperfeval\sweep_freq_response.o: ../Core/Inc/stm32f4xx_hal_conf.h
@@ -45,5 +45,7 @@ ampperfeval\sweep_freq_response.o: ../Users/./lcd/lcd.h
 ampperfeval\sweep_freq_response.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdlib.h
 ampperfeval\sweep_freq_response.o: ../Users/./key/key.h
 ampperfeval\sweep_freq_response.o: ../Core/Inc/adc.h
+ampperfeval\sweep_freq_response.o: ../Core/Inc/usart.h
 ampperfeval\sweep_freq_response.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
 ampperfeval\sweep_freq_response.o: D:\Keil5\ARM\ARMCC\Bin\..\include\string.h
+ampperfeval\sweep_freq_response.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdbool.h

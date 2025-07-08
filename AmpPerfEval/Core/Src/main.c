@@ -108,7 +108,7 @@ int main(void)
 
   // 测试LCD显示
   LCD_ShowString(10, 10, 200, 16, 16, (uint8_t*)"Hello LCD!");
-  
+  AD9851_Init(AD9851_SERIAL_MODE, AD9851_FD_ENABLE);
   // 不在这里启动ADC+DMA+TIM，而是在需要时再启动
   // 这样可以避免不必要的资源占用
   /* USER CODE END 2 */

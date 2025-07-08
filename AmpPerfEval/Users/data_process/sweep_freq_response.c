@@ -328,7 +328,7 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
         float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
         
         // 放宽变化限制：幅度变化超过80%或频率变化超过200Hz认为异常
-        if(amp_ratio < 0.2f || amp_ratio > 5.0f || freq_diff > 200.0f) {
+        if(amp_ratio < 0.3f || amp_ratio > 5.0f || freq_diff > 200.0f) {
             result_valid = false;
         }
     }

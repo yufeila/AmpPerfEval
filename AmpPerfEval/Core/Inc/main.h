@@ -89,7 +89,7 @@ void Test_ADC_Data_Collection(void);
 #define LCD_CMD         (*((volatile uint16_t *)(LCD_BASE)))
 #define LCD_DATA        (*((volatile uint16_t *)(LCD_BASE + 2)))
 
-#define FFT_SIZE        1024U  // 改为1024点FFT
+#define FFT_SIZE        2048U  // 改为2048点FFT
 
 /* USER CODE END Private defines */
 
