@@ -252,10 +252,7 @@ float Tim2_Config_Channel_Fs(float target_fs)
     /* 5. 更新全局变量供 FFT 使用 */
     g_current_Fs = actual_fs;
 
-    /* 6. 启动 TIM2，使采样立即生效 */
-    __HAL_TIM_ENABLE(&htim2);
-
-    /* 7. 返回实际采样率 */
+    /* 6. 返回实际采样率 */
     return actual_fs;
 }
 

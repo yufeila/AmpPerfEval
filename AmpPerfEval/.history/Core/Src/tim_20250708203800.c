@@ -131,8 +131,7 @@ static void tim2_set_fs(uint32_t Fs_target)
     __HAL_TIM_SET_PRESCALER (&htim2, best_psc);
     __HAL_TIM_SET_AUTORELOAD(&htim2, best_arr);
     __HAL_TIM_SET_COUNTER   (&htim2, 0);
-    // 注意：此处不立即启动 TIM2。是否启动由调用者决定，
-    // 以便在 ADC/DMA 准备就绪后再统一开启，避免产生提前 TRGO。
+    __HAL_TIM_ENABLE(&htim2);
 }
 
 /* ----------------------------------------------------------
@@ -252,10 +251,7 @@ float Tim2_Config_Channel_Fs(float target_fs)
     /* 5. 更新全局变量供 FFT 使用 */
     g_current_Fs = actual_fs;
 
-    /* 6. 启动 TIM2，使采样立即生效 */
-    __HAL_TIM_ENABLE(&htim2);
-
-    /* 7. 返回实际采样率 */
+    /* 6. 返回实际采样率 */
     return actual_fs;
 }
 
