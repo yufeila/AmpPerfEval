@@ -229,6 +229,42 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
     
+    // 方案3：数据采集稳定性检查
+    static uint32_t consecutive_valid_samples = 0;
+    
+    // 检查ADC数据质量 - 检查前100个数据点
+    bool data_valid = true;
+    uint32_t zero_count = 0;
+    uint32_t max_count = 0;
+    
+    for(int i = 0; i < 100 && (3*i+2) < BUF_SIZE; i++) {
+        uint16_t val_ch2 = adc_buffer[3*i];
+        uint16_t val_ch4 = adc_buffer[3*i+1];
+        uint16_t val_ch6 = adc_buffer[3*i+2];
+        
+        // 统计异常值
+        if(val_ch2 == 0 || val_ch4 == 0) zero_count++;
+        if(val_ch2 >= 4090 || val_ch4 >= 4090) max_count++;
+    }
+    
+    // 如果零值或饱和值太多，认为数据无效
+    if(zero_count > 5 || max_count > 50) {  // 允许少量异常但不能太多
+        data_valid = false;
+    }
+    
+    if(data_valid) {
+        consecutive_valid_samples++;
+        // 只有连续几次采样都有效才处理
+        if(consecutive_valid_samples >= 1) {  // 降低要求，连续1次即可
+            // 继续正常处理
+        } else {
+            return 0; // 还需要更多有效采样
+        }
+    } else {
+        consecutive_valid_samples = 0;
+        return 0; // 跳过这次处理
+    }
+    
     // 5. 处理本轮采集的数据
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];
     DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
@@ -313,12 +349,12 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
     bool result_valid = true;
     
     // 检查1：幅度应该在合理范围内 (0.005V ~ 5V) - 放宽下限
-    if(pRes->amplitude < 0.05f || pRes->amplitude > 5.0f) {
+    if(pRes->amplitude < 0.005f || pRes->amplitude > 5.0f) {
         result_valid = false;
     }
     
     // 检查2：频率应该在合理范围内 (1Hz ~ 200kHz) - 放宽范围
-    if(pRes->frequency < 100.0f || pRes->frequency > 200000.0f) {
+    if(pRes->frequency < 1.0f || pRes->frequency > 200000.0f) {
         result_valid = false;
     }
     

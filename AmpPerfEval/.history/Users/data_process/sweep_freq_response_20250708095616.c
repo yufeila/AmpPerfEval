@@ -313,12 +313,12 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
     bool result_valid = true;
     
     // 检查1：幅度应该在合理范围内 (0.005V ~ 5V) - 放宽下限
-    if(pRes->amplitude < 0.05f || pRes->amplitude > 5.0f) {
+    if(pRes->amplitude < 0.005f || pRes->amplitude > 5.0f) {
         result_valid = false;
     }
     
     // 检查2：频率应该在合理范围内 (1Hz ~ 200kHz) - 放宽范围
-    if(pRes->frequency < 100.0f || pRes->frequency > 200000.0f) {
+    if(pRes->frequency < 1.0f || pRes->frequency > 200000.0f) {
         result_valid = false;
     }
     
