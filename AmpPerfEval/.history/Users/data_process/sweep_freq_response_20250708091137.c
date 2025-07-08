@@ -322,33 +322,36 @@ static void CalcArrayMean(const float* buf, float *pRes)
 
 /*------------------------------------------------------
  *  函数名称: ProcessSampleData_F32
- *  功能: 调用 spectrum_analysis() 
- *  描述: 临时移除间隔控制，确保每次都执行FFT
+ *  功能: 调用 spectrum_analysis() 减轻 MCU 负担
+ *  描述: 使用 process_interval 控制间隔执行 FFT
  *----------------------------------------------------*/
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs)
 {
-    // 临时移除间隔控制，确保每次都执行FFT进行调试
+    const uint8_t process_interval = PROCESS_INTERVAL;   // 每隔N个循环执行一次FFT
+    static uint8_t process_counter  = 0;
     static char debug_msg[100];
-    
-    // 【调试】在FFT处理前检查输入数据
-    float sample_sum = 0.0f, sample_max = -999.0f, sample_min = 999.0f;
-    for(int i = 0; i < 20; i++) {  // 检查前20个样本
-        sample_sum += sampleData[i];
-        if(sampleData[i] > sample_max) sample_max = sampleData[i];
-        if(sampleData[i] < sample_min) sample_min = sampleData[i];
-    }
-    
-    // 调用FFT分析
-    spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
-    
-    // 【调试】输出FFT输入和输出（每10次输出一次，减少串口负载）
-    static uint8_t fft_debug_counter = 0;
-    if(++fft_debug_counter >= 10) {
-        fft_debug_counter = 0;
-        sprintf(debug_msg, "[FFT] In: avg=%.3f V, range=%.3f V\r\n", 
-                sample_sum/20.0f, sample_max - sample_min);
+
+    if (++process_counter >= process_interval)
+    {
+        process_counter = 0;
+        
+        // 【调试】在FFT处理前检查输入数据
+        float sample_sum = 0.0f, sample_max = -999.0f, sample_min = 999.0f;
+        for(int i = 0; i < 50; i++) {  // 检查前50个样本
+            sample_sum += sampleData[i];
+            if(sampleData[i] > sample_max) sample_max = sampleData[i];
+            if(sampleData[i] < sample_min) sample_min = sampleData[i];
+        }
+        
+        // 串口输出FFT输入数据统计
+        sprintf(debug_msg, "[FFT] In: avg=%.3f, range=%.3f\r\n", 
+                sample_sum/50.0f, sample_max - sample_min);
         HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
         
+        // 调用FFT分析
+        spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
+        
+        // 【调试】输出FFT结果
         sprintf(debug_msg, "[FFT] Out: freq=%.1f Hz, amp=%.3f V\r\n", 
                 pRes->frequency, pRes->amplitude);
         HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
