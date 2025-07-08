@@ -1,11 +1,3 @@
-/*
- * @Author: yyf 17786321727@163.com
- * @Date: 2025-07-07 13:03:52
- * @LastEditors: yyf 17786321727@163.com
- * @LastEditTime: 2025-07-08 09:24:52
- * @FilePath: /AmpPerfEval/Core/Inc/main.h
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -89,7 +81,7 @@ void Test_ADC_Data_Collection(void);
 #define LCD_CMD         (*((volatile uint16_t *)(LCD_BASE)))
 #define LCD_DATA        (*((volatile uint16_t *)(LCD_BASE + 2)))
 
-#define FFT_SIZE        1024U  // 改为1024点FFT
+#define FFT_SIZE        1024U  // ????FFT??????
 
 /* USER CODE END Private defines */
 
