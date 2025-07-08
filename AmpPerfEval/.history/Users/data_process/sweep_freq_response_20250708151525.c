@@ -656,13 +656,6 @@ void Auto_Frequency_Response_Measurement(void)
         LCD_Display_Title_Center("Frequency Response", 10);
         Draw_Coordinate_System();
         
-        // *** 新增：扫频开始调试信息 ***
-        printf("\r\n=== FREQUENCY SWEEP START ===\r\n");
-        printf("Frequency Range: %.1f Hz ~ %.1f Hz\r\n", FREQ_START, FREQ_STOP);
-        printf("Total Points: %d\r\n", FREQ_POINTS);
-        printf("Format: [Point] Set_Freq, Measured_In/Out_Freq, Vin, Vout, Gain, Sampling_Freq\r\n");
-        printf("===============================\r\n");
-        
         first_refresh = 0;
         measurement_complete = 0;  // 重置测量完成标志
         current_point = 0;         // 重置测量点索引
@@ -703,28 +696,6 @@ void Auto_Frequency_Response_Measurement(void)
             
             // 显示测量统计信息
             Display_Measurement_Statistics(freq_response, FREQ_POINTS);
-            
-            // *** 新增：扫频完成调试总结 ***
-            printf("\r\n=== FREQUENCY SWEEP COMPLETED ===\r\n");
-            printf("-3dB Frequency: %.1f Hz\r\n", freq_3db);
-            
-            // 计算并显示最大/最小增益
-            float max_gain = -100.0f, min_gain = 100.0f;
-            float max_gain_freq = 0.0f, min_gain_freq = 0.0f;
-            for(int i = 0; i < FREQ_POINTS; i++) {
-                if(freq_response[i].gain_db > max_gain) {
-                    max_gain = freq_response[i].gain_db;
-                    max_gain_freq = freq_response[i].frequency;
-                }
-                if(freq_response[i].gain_db < min_gain) {
-                    min_gain = freq_response[i].gain_db;
-                    min_gain_freq = freq_response[i].frequency;
-                }
-            }
-            printf("Max Gain: %.2f dB @ %.1f Hz\r\n", max_gain, max_gain_freq);
-            printf("Min Gain: %.2f dB @ %.1f Hz\r\n", min_gain, min_gain_freq);
-            printf("Gain Range: %.2f dB\r\n", max_gain - min_gain);
-            printf("==================================\r\n\r\n");
         }
     }
 }

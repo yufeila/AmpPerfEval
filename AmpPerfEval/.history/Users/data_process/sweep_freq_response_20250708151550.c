@@ -703,28 +703,6 @@ void Auto_Frequency_Response_Measurement(void)
             
             // 显示测量统计信息
             Display_Measurement_Statistics(freq_response, FREQ_POINTS);
-            
-            // *** 新增：扫频完成调试总结 ***
-            printf("\r\n=== FREQUENCY SWEEP COMPLETED ===\r\n");
-            printf("-3dB Frequency: %.1f Hz\r\n", freq_3db);
-            
-            // 计算并显示最大/最小增益
-            float max_gain = -100.0f, min_gain = 100.0f;
-            float max_gain_freq = 0.0f, min_gain_freq = 0.0f;
-            for(int i = 0; i < FREQ_POINTS; i++) {
-                if(freq_response[i].gain_db > max_gain) {
-                    max_gain = freq_response[i].gain_db;
-                    max_gain_freq = freq_response[i].frequency;
-                }
-                if(freq_response[i].gain_db < min_gain) {
-                    min_gain = freq_response[i].gain_db;
-                    min_gain_freq = freq_response[i].frequency;
-                }
-            }
-            printf("Max Gain: %.2f dB @ %.1f Hz\r\n", max_gain, max_gain_freq);
-            printf("Min Gain: %.2f dB @ %.1f Hz\r\n", min_gain, min_gain_freq);
-            printf("Gain Range: %.2f dB\r\n", max_gain - min_gain);
-            printf("==================================\r\n\r\n");
         }
     }
 }
