@@ -154,7 +154,7 @@ float Tim2_Config_AutoFs(float f0_hz)
     float Fs_min = 2.5f * f0_hz;              // 防混叠，至少2.5倍信号频率
     
     /* 2. 计算理想采样率（频率分辨率） */
-    float Fs_ideal = 0.001f * f0_hz * FFT_SIZE; // 0.1%分辨率，FFT_SIZE=2048
+    float Fs_ideal = 0.001f * f0_hz * 2048.0f; // 0.1%分辨率，FFT_SIZE=2048
     
     /* 3. 硬件约束 */
     float Fs_hw_max = TIM_MAX_TRIGGER_FREQ;    // 硬件最大触发频率
@@ -208,7 +208,7 @@ float Tim2_Config_AutoFs(float f0_hz)
 
     /* 9. 调试输出：高频点采样率配置详情 */
     if (f0_hz > 25000.0f) {
-        float freq_resolution = actual_fs / 2048.0f; // FFT_SIZE=2048
+        float freq_resolution = actual_fs / FFT_SIZE;
         printf("FS_CONFIG: f0=%.1fHz, Fs_target=%.0fHz, Fs_actual=%.0fHz, Resolution=%.1fHz\r\n",
                f0_hz, Fs_target, actual_fs, freq_resolution);
     }

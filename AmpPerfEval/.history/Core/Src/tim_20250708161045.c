@@ -154,7 +154,7 @@ float Tim2_Config_AutoFs(float f0_hz)
     float Fs_min = 2.5f * f0_hz;              // 防混叠，至少2.5倍信号频率
     
     /* 2. 计算理想采样率（频率分辨率） */
-    float Fs_ideal = 0.001f * f0_hz * FFT_SIZE; // 0.1%分辨率，FFT_SIZE=2048
+    float Fs_ideal = 0.001f * f0_hz * FF; // 0.1%分辨率，FFT_SIZE=2048
     
     /* 3. 硬件约束 */
     float Fs_hw_max = TIM_MAX_TRIGGER_FREQ;    // 硬件最大触发频率
