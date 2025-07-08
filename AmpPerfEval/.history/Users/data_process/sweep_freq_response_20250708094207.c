@@ -2,7 +2,6 @@
 #include "usart.h"     // 用于串口调试
 #include <string.h>    // 用于strlen
 #include <stdio.h>     // 用于sprintf
-#include <stdbool.h>   // 用于bool类型
 
 #include "./data_process/sweep_freq_response.h"
 #include <math.h>
@@ -229,42 +228,6 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
     
-    // 方案3：数据采集稳定性检查
-    static uint32_t consecutive_valid_samples = 0;
-    
-    // 检查ADC数据质量 - 检查前100个数据点
-    bool data_valid = true;
-    uint32_t zero_count = 0;
-    uint32_t max_count = 0;
-    
-    for(int i = 0; i < 100 && (3*i+2) < BUF_SIZE; i++) {
-        uint16_t val_ch2 = adc_buffer[3*i];
-        uint16_t val_ch4 = adc_buffer[3*i+1];
-        uint16_t val_ch6 = adc_buffer[3*i+2];
-        
-        // 统计异常值
-        if(val_ch2 == 0 || val_ch4 == 0) zero_count++;
-        if(val_ch2 >= 4090 || val_ch4 >= 4090) max_count++;
-    }
-    
-    // 如果零值或饱和值太多，认为数据无效
-    if(zero_count > 5 || max_count > 50) {  // 允许少量异常但不能太多
-        data_valid = false;
-    }
-    
-    if(data_valid) {
-        consecutive_valid_samples++;
-        // 只有连续几次采样都有效才处理
-        if(consecutive_valid_samples >= 1) {  // 降低要求，连续1次即可
-            // 继续正常处理
-        } else {
-            return 0; // 还需要更多有效采样
-        }
-    } else {
-        consecutive_valid_samples = 0;
-        return 0; // 跳过这次处理
-    }
-    
     // 5. 处理本轮采集的数据
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];
     DemuxADCData(src, adc_in_buffer, adc_ac_out_buffer, adc_dc_out_buffer, FFT_SIZE);
@@ -336,79 +299,35 @@ static void CalcArrayMean(const float* buf, float *pRes)
 /*------------------------------------------------------
  *  函数名称: ProcessSampleData_F32
  *  功能: 调用 spectrum_analysis() 
- *  描述: 处理采样数据并进行FFT分析，增加数据和结果有效性检查
+ *  描述: 临时移除间隔控制，确保每次都执行FFT
  *----------------------------------------------------*/
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs)
 {
-    static SpectrumResult_t last_valid_result = {0.0f, 1000.0f, 0, 0.0f}; // 初始化为合理默认值
+    // 临时移除间隔控制，确保每次都执行FFT进行调试
+    static char debug_msg[100];
     
-    // 方案1：检查输入数据有效性
-    float data_sum = 0.0f, data_max = -999.0f, data_min = 999.0f;
-    for(int i = 0; i < FFT_SIZE; i++) {
-        data_sum += fabsf(sampleData[i]);
-        if(sampleData[i] > data_max) data_max = sampleData[i];
-        if(sampleData[i] < data_min) data_min = sampleData[i];
-    }
-    
-    float data_range = data_max - data_min;
-    float data_avg = data_sum / FFT_SIZE;
-    
-    // 如果数据范围太小或平均值异常，可能是无效采样
-    if(data_range < 0.01f || data_avg < 0.001f) {  // 小于10mV范围或1mV平均值认为异常
-        // 返回上一次有效结果
-        if(last_valid_result.amplitude > 0.01f) {
-            *pRes = last_valid_result;
-        } else {
-            pRes->amplitude = 0.0f;
-            pRes->frequency = 0.0f;
-            pRes->bin_index = 0;
-            pRes->delta = 0.0f;
-        }
-        return;
+    // 【调试】在FFT处理前检查输入数据
+    float sample_sum = 0.0f, sample_max = -999.0f, sample_min = 999.0f;
+    for(int i = 0; i < 20; i++) {  // 检查前20个样本
+        sample_sum += sampleData[i];
+        if(sampleData[i] > sample_max) sample_max = sampleData[i];
+        if(sampleData[i] < sample_min) sample_min = sampleData[i];
     }
     
     // 调用FFT分析
     spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
     
-    // 方案2：结果有效性检查和滤波
-    bool result_valid = true;
-    
-    // 检查1：幅度应该在合理范围内 (0.01V ~ 5V)
-    if(pRes->amplitude < 0.01f || pRes->amplitude > 5.0f) {
-        result_valid = false;
-    }
-    
-    // 检查2：频率应该在合理范围内 (10Hz ~ 100kHz)  
-    if(pRes->frequency < 10.0f || pRes->frequency > 100000.0f) {
-        result_valid = false;
-    }
-    
-    // 检查3：如果有上次有效结果，新结果不应该变化太大（避免突变）
-    if(last_valid_result.amplitude > 0.01f) {
-        float amp_ratio = pRes->amplitude / last_valid_result.amplitude;
-        float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
+    // 【调试】输出FFT输入和输出（每10次输出一次，减少串口负载）
+    static uint8_t fft_debug_counter = 0;
+    if(++fft_debug_counter >= 10) {
+        fft_debug_counter = 0;
+        sprintf(debug_msg, "[FFT] In: avg=%.3f V, range=%.3f V\r\n", 
+                sample_sum/20.0f, sample_max - sample_min);
+        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
         
-        // 幅度变化超过50%或频率变化超过100Hz认为异常
-        if(amp_ratio < 0.5f || amp_ratio > 2.0f || freq_diff > 100.0f) {
-            result_valid = false;
-        }
-    }
-    
-    // 检查4：FFT输出的频率应该与输入数据特征匹配
-    // 简单检查：如果数据有明显AC特征但FFT频率为0，可能有问题
-    if(data_range > 0.1f && pRes->frequency < 10.0f) {
-        result_valid = false;
-    }
-    
-    if(result_valid) {
-        // 结果看起来合理，更新last_valid_result
-        last_valid_result = *pRes;
-    } else {
-        // 结果异常，使用上次有效结果
-        if(last_valid_result.amplitude > 0.01f) {
-            *pRes = last_valid_result;
-        }
-        // 如果没有有效的历史结果，保持当前结果但可能显示异常
+        sprintf(debug_msg, "[FFT] Out: freq=%.1f Hz, amp=%.3f V\r\n", 
+                pRes->frequency, pRes->amplitude);
+        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
     }
 }
 

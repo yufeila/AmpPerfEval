@@ -2,7 +2,6 @@
 #include "usart.h"     // 用于串口调试
 #include <string.h>    // 用于strlen
 #include <stdio.h>     // 用于sprintf
-#include <stdbool.h>   // 用于bool类型
 
 #include "./data_process/sweep_freq_response.h"
 #include <math.h>

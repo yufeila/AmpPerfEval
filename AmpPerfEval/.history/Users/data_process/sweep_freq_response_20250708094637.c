@@ -2,7 +2,6 @@
 #include "usart.h"     // 用于串口调试
 #include <string.h>    // 用于strlen
 #include <stdio.h>     // 用于sprintf
-#include <stdbool.h>   // 用于bool类型
 
 #include "./data_process/sweep_freq_response.h"
 #include <math.h>
@@ -228,42 +227,6 @@ uint8_t Process_ADC_Data_F32(SpectrumResult_t* pRes1, SpectrumResult_t* pRes2, f
     // 4. 停止当前轮次的ADC+TIM（为下次启动做准备）
     HAL_ADC_Stop_DMA(&hadc1);
     HAL_TIM_Base_Stop(&htim2);
-    
-    // 方案3：数据采集稳定性检查
-    static uint32_t consecutive_valid_samples = 0;
-    
-    // 检查ADC数据质量 - 检查前100个数据点
-    bool data_valid = true;
-    uint32_t zero_count = 0;
-    uint32_t max_count = 0;
-    
-    for(int i = 0; i < 100 && (3*i+2) < BUF_SIZE; i++) {
-        uint16_t val_ch2 = adc_buffer[3*i];
-        uint16_t val_ch4 = adc_buffer[3*i+1];
-        uint16_t val_ch6 = adc_buffer[3*i+2];
-        
-        // 统计异常值
-        if(val_ch2 == 0 || val_ch4 == 0) zero_count++;
-        if(val_ch2 >= 4090 || val_ch4 >= 4090) max_count++;
-    }
-    
-    // 如果零值或饱和值太多，认为数据无效
-    if(zero_count > 5 || max_count > 50) {  // 允许少量异常但不能太多
-        data_valid = false;
-    }
-    
-    if(data_valid) {
-        consecutive_valid_samples++;
-        // 只有连续几次采样都有效才处理
-        if(consecutive_valid_samples >= 1) {  // 降低要求，连续1次即可
-            // 继续正常处理
-        } else {
-            return 0; // 还需要更多有效采样
-        }
-    } else {
-        consecutive_valid_samples = 0;
-        return 0; // 跳过这次处理
-    }
     
     // 5. 处理本轮采集的数据
     const uint16_t *src = (const uint16_t *)&adc_buffer[0];

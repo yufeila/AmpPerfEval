@@ -129,6 +129,20 @@ void spectrum_analysis(const float *x, uint16_t N, float fs, SpectrumResult_t *r
     {
         if (mag[k] > max_val) { max_val = mag[k]; k_max = k; }
     }
+    
+    // 调试输出：检查FFT结果
+    static uint8_t fft_debug_cnt = 0;
+    if(++fft_debug_cnt >= 50) {  // 每50次输出一次，避免串口阻塞
+        fft_debug_cnt = 0;
+        char debug_msg[120];
+        extern UART_HandleTypeDef huart1;
+        
+        sprintf(debug_msg, "[FFT_DBG] N=%u, fs=%.1f, vpk_time=%.4f\r\n", N, fs, vpk_time);
+        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
+        
+        sprintf(debug_msg, "[FFT_DBG] DC=%.4f, k_max=%u, max_val=%.4f\r\n", mag[0], k_max, max_val);
+        HAL_UART_Transmit(&huart1, (uint8_t*)debug_msg, strlen(debug_msg), 50);
+    }
 
     /* 3) 选左 / 右邻幅值大的做插值 */
     uint16_t k_left  = (k_max == 1)       ? k_max     : k_max - 1;
