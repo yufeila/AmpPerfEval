@@ -653,6 +653,9 @@ void Auto_Frequency_Response_Measurement(void)
         // 强制停止所有运行中的操作
         Force_Stop_All_Operations();
         
+        // *** 停止时清除扫频标志 ***
+        g_sweep_running = 0;
+        
         first_refresh = 1;  // 触发重新初始化
         sweep_freq_response_flag = 0;  // 清除标志位
     }

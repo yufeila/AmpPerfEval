@@ -19,6 +19,7 @@ extern uint8_t current_system_state;
 /* 基本参数显示 */
 static SignalAnalysisResult_t data_at_1k;
 uint8_t key_state = 0;
+uint8_t g_sweep_running = 0;  // 扫频运行状态标志，供ProcessSampleData_F32使用
 /* 扫频参数 */
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
@@ -331,7 +332,7 @@ static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, flo
             float amp_ratio = pRes->amplitude / last_valid_result.amplitude;
             float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
             
-            // 基本测量模式：幅度变化超过70%或频率变化超过200Hz认为异常
+            // 基本测量模式：幅度变化超过80%或频率变化超过200Hz认为异常
             if(amp_ratio < 0.3f || amp_ratio > 5.0f || freq_diff > 200.0f) {
                 result_valid = false;
             }
@@ -653,6 +654,9 @@ void Auto_Frequency_Response_Measurement(void)
         // 强制停止所有运行中的操作
         Force_Stop_All_Operations();
         
+        // *** 停止时清除扫频标志 ***
+        g_sweep_running = 0;
+        
         first_refresh = 1;  // 触发重新初始化
         sweep_freq_response_flag = 0;  // 清除标志位
     }
@@ -666,6 +670,9 @@ void Auto_Frequency_Response_Measurement(void)
         // 初始化页面显示
         LCD_Display_Title_Center("Frequency Response", 10);
         Draw_Coordinate_System();
+        
+        // *** 设置扫频运行标志 ***
+        g_sweep_running = 1;
         
         // *** 新增：扫频开始调试信息 ***
         printf("\r\n=== FREQUENCY SWEEP START ===\r\n");
@@ -707,6 +714,9 @@ void Auto_Frequency_Response_Measurement(void)
         if (current_point >= FREQ_POINTS)
         {
             measurement_complete = 1;
+            
+            // *** 清除扫频运行标志 ***
+            g_sweep_running = 0;
             
             // 找出-3dB频点并显示
             float freq_3db = Find_3dB_Frequency(freq_response, FREQ_POINTS);

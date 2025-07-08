@@ -19,6 +19,7 @@ extern uint8_t current_system_state;
 /* 基本参数显示 */
 static SignalAnalysisResult_t data_at_1k;
 uint8_t key_state = 0;
+uint8_t g_sweep_running = 0;  // 扫频运行状态标志，供ProcessSampleData_F32使用
 /* 扫频参数 */
 static FreqResponse_t freq_response[FREQ_POINTS];
 static uint8_t measurement_complete = 0;    // 扫频测量完成标志：0=进行中，1=已完成，避免在while循环中进行大循环扫频
@@ -305,55 +306,54 @@ static void CalcArrayMean(const float* buf, float *pRes)
 static void ProcessSampleData_F32(float *sampleData, SpectrumResult_t *pRes, float fs)
 {
     static SpectrumResult_t last_valid_result = {0.0f, 1000.0f, 0, 0.0f}; // 初始化为合理默认值
+    static uint8_t sweep_mode_active = 0; // 扫频模式标志
     
     // 1. 调用FFT分析
     spectrum_analysis(sampleData, FFT_SIZE, fs, pRes);
 
-    // 2. 检查当前系统状态，决定是否启用有效性检查
-    extern uint8_t current_system_state; // 声明外部系统状态变量
-    
-    if(current_system_state == BASIC_MEASUREMENT_STATE) {
-        // 基本测量模式：启用结果有效性检查和滤波
-        bool result_valid = true;
-        
-        // 检查1：幅度应该在合理范围内 (0.01V ~ 5V)
-        if(pRes->amplitude < 0.01f || pRes->amplitude > 5.0f) {
-            result_valid = false;
-        }
-
-        // 检查2：频率应该在合理范围内 (50Hz ~ 220kHz)
-        if(pRes->frequency < 50.0f || pRes->frequency > 220000.0f) {
-            result_valid = false;
-        }
-        
-        // 检查3：如果有上次有效结果，新结果不应该变化太大（避免突变）
-        if(last_valid_result.amplitude > 0.005f) {
-            float amp_ratio = pRes->amplitude / last_valid_result.amplitude;
-            float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
-            
-            // 基本测量模式：幅度变化超过70%或频率变化超过200Hz认为异常
-            if(amp_ratio < 0.3f || amp_ratio > 5.0f || freq_diff > 200.0f) {
-                result_valid = false;
-            }
-        }
-        
-        if(result_valid) {
-            // 结果看起来合理，更新last_valid_result
-            last_valid_result = *pRes;
-        } else {
-            // 结果异常，使用上次有效结果
-            if(last_valid_result.amplitude > 0.005f) {
-                *pRes = last_valid_result;
-            }
-            // 如果没有有效的历史结果，保持当前结果
-        }
-    } 
-    else if(current_system_state == SWEEP_FREQ_RESPONSE_STATE) {
-        // 扫频模式：完全禁用有效性检查，直接使用FFT原始结果
-        // 每个频点只采样一次，做一次FFT，保持原始测量结果
-        // 不做任何过滤或替换
+    // 2. 检测是否处于扫频模式（通过全局变量或快速频率变化判断）
+    extern uint8_t g_sweep_running; // 声明外部扫频状态变量
+    if(g_sweep_running) {
+        sweep_mode_active = 1;
+    } else {
+        sweep_mode_active = 0;
     }
-    // 其他状态：保持FFT原始结果
+
+    // 3. 结果有效性检查和滤波
+    bool result_valid = true;
+    
+    // 检查1：幅度应该在合理范围内 (0.001V ~ 10V) - 进一步放宽
+    if(pRes->amplitude < 0.001f || pRes->amplitude > 10.0f) {
+        result_valid = false;
+    }
+
+    // 检查2：频率应该在合理范围内 (10Hz ~ 250kHz) - 进一步放宽
+    if(pRes->frequency < 10.0f || pRes->frequency > 250000.0f) {
+        result_valid = false;
+    }
+    
+    // 检查3：扫频模式下大幅放宽或禁用频率变化检查
+    if(!sweep_mode_active && last_valid_result.amplitude > 0.005f) {
+        float amp_ratio = pRes->amplitude / last_valid_result.amplitude;
+        float freq_diff = fabsf(pRes->frequency - last_valid_result.frequency);
+        
+        // 非扫频模式：幅度变化超过90%或频率变化超过500Hz认为异常
+        if(amp_ratio < 0.1f || amp_ratio > 10.0f || freq_diff > 500.0f) {
+            result_valid = false;
+        }
+    }
+    // 扫频模式下：跳过频率变化检查，允许大幅度频率跳跃
+    
+    if(result_valid) {
+        // 结果看起来合理，更新last_valid_result
+        last_valid_result = *pRes;
+    } else {
+        // 结果异常，在扫频模式下保持原始结果，非扫频模式使用历史结果
+        if(!sweep_mode_active && last_valid_result.amplitude > 0.005f) {
+            *pRes = last_valid_result;
+        }
+        // 扫频模式下或没有有效历史结果时，保持当前FFT结果
+    }
 }
 
 /**
@@ -667,6 +667,9 @@ void Auto_Frequency_Response_Measurement(void)
         LCD_Display_Title_Center("Frequency Response", 10);
         Draw_Coordinate_System();
         
+        // *** 设置扫频运行标志 ***
+        g_sweep_running = 1;
+        
         // *** 新增：扫频开始调试信息 ***
         printf("\r\n=== FREQUENCY SWEEP START ===\r\n");
         printf("Frequency Range: %.1f Hz ~ %.1f Hz\r\n", FREQ_START, FREQ_STOP);
@@ -707,6 +710,9 @@ void Auto_Frequency_Response_Measurement(void)
         if (current_point >= FREQ_POINTS)
         {
             measurement_complete = 1;
+            
+            // *** 清除扫频运行标志 ***
+            g_sweep_running = 0;
             
             // 找出-3dB频点并显示
             float freq_3db = Find_3dB_Frequency(freq_response, FREQ_POINTS);

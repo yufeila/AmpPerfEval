@@ -653,6 +653,9 @@ void Auto_Frequency_Response_Measurement(void)
         // 强制停止所有运行中的操作
         Force_Stop_All_Operations();
         
+        // *** 停止时清除扫频标志 ***
+        g_sweep_running = 0;
+        
         first_refresh = 1;  // 触发重新初始化
         sweep_freq_response_flag = 0;  // 清除标志位
     }
@@ -707,6 +710,9 @@ void Auto_Frequency_Response_Measurement(void)
         if (current_point >= FREQ_POINTS)
         {
             measurement_complete = 1;
+            
+            // *** 清除扫频运行标志 ***
+            g_sweep_running = 0;
             
             // 找出-3dB频点并显示
             float freq_3db = Find_3dB_Frequency(freq_response, FREQ_POINTS);
