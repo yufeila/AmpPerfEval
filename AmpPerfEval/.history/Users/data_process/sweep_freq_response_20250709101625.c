@@ -156,7 +156,7 @@ void Basic_Measurement(void)
     if(measure_r_out_flag)
     {
         // 锁存上一次测量结果
-        last_v_open_drain_out = data_at_1k.adc_ac_out_Result;
+        v_open_drain_out = data_at_1k.adc_ac_out_Result;
         
         // 开启继电器
         RELAY_ON;
@@ -178,7 +178,7 @@ void Basic_Measurement(void)
 		average_spectrumresult_array(tmp, &v_out, PROCESS_ARRAY_SIZE_WITH_R_L);
 
         // 计算并保存R_out结果
-        r_out_value = CalculateRout(&v_out, &last_v_open_drain_out);
+        r_out_value = CalculateRout(&v_out, &v_open_drain_out);
         r_out_measured = 1;  // 标记已测量完成
 
         measure_r_out_flag = 0;  // 清除测量触发标志位

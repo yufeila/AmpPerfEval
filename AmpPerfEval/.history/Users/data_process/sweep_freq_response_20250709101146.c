@@ -156,7 +156,7 @@ void Basic_Measurement(void)
     if(measure_r_out_flag)
     {
         // 锁存上一次测量结果
-        last_v_open_drain_out = data_at_1k.adc_ac_out_Result;
+        v_open_drain_out = data_at_1k.adc_ac_out_Result;
         
         // 开启继电器
         RELAY_ON;
@@ -178,7 +178,7 @@ void Basic_Measurement(void)
 		average_spectrumresult_array(tmp, &v_out, PROCESS_ARRAY_SIZE_WITH_R_L);
 
         // 计算并保存R_out结果
-        r_out_value = CalculateRout(&v_out, &last_v_open_drain_out);
+        r_out_value = CalculateRout(&v_out, &v_open_drain_out);
         r_out_measured = 1;  // 标记已测量完成
 
         measure_r_out_flag = 0;  // 清除测量触发标志位
@@ -958,13 +958,13 @@ static void Draw_Coordinate_System(void)
     }
     
     // 绘制Y轴刻度和标签(增益dB)
-    int16_t gain_range[] = {-20, 0, 20, 40};
-    char gain_labels[][5] = {"-20", "0", "20", "+40"};
+    int16_t gain_range[] = {-20, 0, 20，};
+    char gain_labels[][5] = {"-40", "-20", "0", "+20"};
     
     for(int i = 0; i < 4; i++)
     {
-        // 假设增益范围为-30dB到+50dBdB
-        uint16_t y_pos = plot_y_end - (gain_range[i] + 30) * (plot_y_end - plot_y_start) / 80;
+        // 假设增益范围为-50dB到+30dB
+        uint16_t y_pos = plot_y_end - (gain_range[i] + 50) * (plot_y_end - plot_y_start) / 80;
         
         if(y_pos >= plot_y_start && y_pos <= plot_y_end)
         {
@@ -1007,9 +1007,9 @@ void plot_Frequency_Response_Point(FreqResponse_t point)
     // 计算X坐标
     uint16_t x_pos = plot_x_start + (log_freq - log_min) * (plot_x_end - plot_x_start) / (log_max - log_min);
     
-    // 计算Y坐标(增益范围-30dB到+50dB)
-    float gain_min = -30.0f;
-    float gain_max = 50.0f;
+    // 计算Y坐标(增益范围-50dB到+30dB)
+    float gain_min = -50.0f;
+    float gain_max = 30.0f;
     uint16_t y_pos = plot_y_end - (point.gain_db - gain_min) * (plot_y_end - plot_y_start) / (gain_max - gain_min);
     
     // 边界检查
