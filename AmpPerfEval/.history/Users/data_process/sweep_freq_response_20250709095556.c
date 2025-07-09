@@ -588,18 +588,10 @@ void Basic_Measurement_Page_Update(void)
 
     /* 输出交流部分 */
     // 开路电压显示 (Vout(Open):)
-    if(!r_out_measured) // 如果未测量输出阻抗，显示开路电压
-    {
-        LCD_Fill(130, 145, 230, 157, WHITE);
-        sprintf(dispBuff, "%.3f V", data_at_1k.adc_ac_out_Result.amplitude);
-        LCD_ShowString(130, 145, 120, 12, 12, (uint8_t*)dispBuff);
-    }
-    else // 如果已测量输出阻抗，显示带负载电压
-    {
-        LCD_Fill(130, 145, 230, 157, WHITE);
-        sprintf(dispBuff, "%.3f V", last_v_open_drain_out.amplitude);
-        LCD_ShowString(130, 145, 120, 12, 12, (uint8_t*)dispBuff);
-    }
+    if(r_out_measured)
+    LCD_Fill(130, 145, 230, 157, WHITE);
+    sprintf(dispBuff, "%.3f V", data_at_1k.adc_ac_out_Result.amplitude);
+    LCD_ShowString(130, 145, 120, 12, 12, (uint8_t*)dispBuff);
 
     // 输出频率显示 (fs:) - 应该与输入频率相同
     LCD_Fill(60, 175, 230, 187, WHITE);
@@ -631,8 +623,7 @@ void Basic_Measurement_Page_Update(void)
     {
         // 如果已测量输出阻抗，显示负载电压（这里需要保存测量时的值）
         LCD_Fill(100, 160, 230, 172, WHITE);
-        sprintf(dispBuff, "%.3f V", v_out.amplitude, "(measured)");
-        LCD_ShowString(100, 160, 120, 12, 12, (uint8_t*)dispBuff);
+        LCD_ShowString(100, 160, 120, 12, 12, (uint8_t*)"(measured)");
     }
     else
     {
