@@ -984,7 +984,7 @@ static void Draw_Coordinate_System(void)
     LCD_ShowString(plot_x_start + 60, plot_y_end + 20, 80, 12, 12, (uint8_t*)"Frequency");
     
     // 旋转文字较复杂，先用简单的Y轴标题
-    LCD_ShowString(30, plot_y_start, 20, 12, 12, (uint8_t*)"dB");
+    LCD_ShowString(30, plot_y_start + 100, 20, 12, 12, (uint8_t*)"dB");
 }
 
 /**
