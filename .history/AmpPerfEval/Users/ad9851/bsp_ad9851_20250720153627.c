@@ -211,8 +211,8 @@ void AD9851_Init(uint8_t mode, uint8_t FD)
         ad9851_reset_parallel();
     }
     
-    // 设置测试频率10kHz
-    AD9851_Setfq(mode, FD, 10000);
+    // 设置测试频率1kHz
+    AD9851_Setfq(mode, FD, 100000);
 }
 
 //***************************************************//

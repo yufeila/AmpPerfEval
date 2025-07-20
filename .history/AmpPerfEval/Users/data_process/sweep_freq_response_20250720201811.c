@@ -518,17 +518,6 @@ void Basic_Measurement_Page_Init(void)
     POINT_COLOR = GRAY;
     LCD_DrawLine(10, 120, 230, 120);    // 输入和AC输出之间的分割线
     LCD_DrawLine(10, 210, 230, 210);    // AC输出和DC输出之间的分割线
-
-    // 增益测量部分
-    POINT_COLOR = SUBTITLE_COLOR;
-    BACK_COLOR = WHITE;
-    LCD_ShowString(10, 255, 200, 16, 16, (uint8_t*)"Gain Measurement");
-
-    // 显示数据标签
-    POINT_COLOR = DATA_COLOR;
-    BACK_COLOR = WHITE; 
-    LCD_ShowString(15, 275, 100, 12, 12, (uint8_t*)"Gain:");
-
 }
 
 /**
@@ -630,7 +619,7 @@ void Basic_Measurement_Page_Update(void)
     /* 计算开路增益 */
     float gain = (data_at_1k.adc_ac_out_Result.amplitude * 11 * 47/247) / (V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain) ;
     sprintf(dispBuff, "%.3f V", gain);
-    LCD_ShowString(90, 275, 120, 12, 12, (uint8_t*)dispBuff);
+    LCD_ShowString(100, 160, 120, 12, 12, (uint8_t*)dispBuff);
 
     /* 输出阻抗部分 - 根据测量状态显示 */
     LCD_Fill(60, 190, 230, 202, WHITE);

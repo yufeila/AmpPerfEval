@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/yufei/project/2019D/stm32f407/AmpPerfEval/Users/ad9851",
+      "program": "/Users/yufei/project/2019D/stm32f407/AmpPerfEval/Users/ad9851/build/Debug/outDebug"
+    }
+  ]
+}

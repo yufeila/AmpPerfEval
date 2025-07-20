@@ -35,8 +35,8 @@ void ad9851_wr_serial(uint8_t w0, double frequence)
     long int y;
     double x;
 
-    // 计算频率的HEX值(30MHz * 6倍频 = 180MHz)
-    x = 4294967295.0 / 180.0;  // 系统主频为180MHz
+    // 计算频率的HEX值(基准时钟30MHz)
+    x = 4294967295.0 / 30.0;  // 修正：使用30MHz基准时钟
     frequence = frequence / 1000000.0;  // 单位换算为MHz
     frequence = frequence * x;  // 计算频率控制字
     y = (long int)frequence;
@@ -158,8 +158,8 @@ void ad9851_wr_parallel(uint8_t w0, double frequence)
     double x;
     uint8_t freq_bytes[4];
 
-    // 计算频率的HEX值(30MHz * 6倍频 = 180MHz)
-    x = 4294967295.0 / 180.0;  // 修正为180MHz
+    // 计算频率的HEX值(基准时钟30MHz)
+    x = 4294967295.0 / 30.0;  // 修正：使用30MHz基准时钟
     frequence = frequence / 1000000.0;
     frequence = frequence * x;
     y = (long int)frequence;
