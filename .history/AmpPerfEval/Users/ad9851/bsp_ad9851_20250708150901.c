@@ -220,17 +220,11 @@ void AD9851_Init(uint8_t mode, uint8_t FD)
 //---------------------------------------------------//
 void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence)
 {
-    uint8_t control_word = AD9851_CTRL_NORMAL;  // 默认正常工作模式
+    uint8_t control_word = 0x00;
     
-    // 根据倍频设置构造控制字
+    // 根据倍频设置构造控制字(bit0为6倍频控制位)
     if(FD == AD9851_FD_ENABLE)
-        control_word |= AD9851_FD_ENABLE_BIT;  // 设置6倍频位
-    
-    // 确保Power-Down位(D7)为0，防止进入休眠模式
-    control_word &= ~AD9851_POWER_DOWN_D7;  // 清除D7位，确保正常工作
-    
-    // 检查控制字是否正确
-    AD9851_Check_Control_Word(control_word);
+        control_word |= 0x01;  // 设置6倍频位(根据AD9851数据手册，bit0控制6倍频)
     
     // 根据工作模式调用相应的写入函数
     if(mode == AD9851_SERIAL_MODE)
@@ -248,58 +242,15 @@ void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence)
  * @param frequency 目标频率 (Hz)
  * @retval None
  */
-/**
- * @brief 强制退出AD9851休眠模式
- * @retval None
- */
-void AD9851_Exit_Power_Down(void)
-{
-    // 发送一个正常的控制字，确保D7位为0
-    uint8_t control_word = AD9851_CTRL_NORMAL;  // 正常工作模式，D7=0
-    
-    // 使用串口模式发送控制字
-    ad9851_wr_serial(control_word, 1000000.0);  // 1MHz测试频率
-    
-    HAL_Delay(5);  // 等待芯片稳定
-    
-    #if AD9851_DEBUG_ENABLE
-    printf("AD9851: Exit Power-Down mode, Control Word: 0x%02X\r\n", control_word);
-    #endif
-}
-
-/**
- * @brief 检查AD9851控制字是否正确设置
- * @param control_word 控制字
- * @retval 1: 正常, 0: 可能有问题
- */
-uint8_t AD9851_Check_Control_Word(uint8_t control_word)
-{
-    // 检查D7位是否为0（Power-Down位）
-    if(control_word & AD9851_POWER_DOWN_D7)
-    {
-        #if AD9851_DEBUG_ENABLE
-        printf("AD9851 WARNING: Power-Down bit (D7) is set! Control Word: 0x%02X\r\n", control_word);
-        #endif
-        return 0;  // 有问题
-    }
-    
-    #if AD9851_DEBUG_ENABLE
-    printf("AD9851: Control Word OK: 0x%02X\r\n", control_word);
-    #endif
-    
-    return 1;  // 正常
-}
-
-/**
- * @brief 设置AD9851输出频率 (简化版本，用于频率响应测量)
- * @param frequency 目标频率 (Hz)
- * @retval None
- */
 void AD9851_Set_Frequency(float frequency)
 {
+
+    AD9851_Init(AD9851_SERIAL_MODE, AD9851_FD_ENABLE);
+
     // 使用串口模式，启用6倍频
     uint8_t mode = AD9851_SERIAL_MODE;
     uint8_t FD = AD9851_FD_ENABLE;
+ 
     
     // 转换为double类型调用原有函数
     double freq_double = (double)frequency;
@@ -309,6 +260,7 @@ void AD9851_Set_Frequency(float frequency)
     
     // 添加小延时确保频率设置完成
     HAL_Delay(1);
+    
 }
 
 

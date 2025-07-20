@@ -229,9 +229,6 @@ void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence)
     // 确保Power-Down位(D7)为0，防止进入休眠模式
     control_word &= ~AD9851_POWER_DOWN_D7;  // 清除D7位，确保正常工作
     
-    // 检查控制字是否正确
-    AD9851_Check_Control_Word(control_word);
-    
     // 根据工作模式调用相应的写入函数
     if(mode == AD9851_SERIAL_MODE)
     {

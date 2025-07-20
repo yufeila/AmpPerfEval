@@ -690,9 +690,6 @@ void Auto_Frequency_Response_Measurement(void)
         LCD_Clear(WHITE);
         HAL_Delay(50);  // 短暂延时，确保LCD清除完成
         
-        // 确保AD9851退出休眠模式并正常工作
-        AD9851_Exit_Power_Down();
-        
         // 初始化页面显示
         LCD_Display_Title_Center("Frequency Response", 10);
         Draw_Coordinate_System();

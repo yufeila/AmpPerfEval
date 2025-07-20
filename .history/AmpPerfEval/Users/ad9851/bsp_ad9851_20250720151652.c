@@ -229,9 +229,6 @@ void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence)
     // 确保Power-Down位(D7)为0，防止进入休眠模式
     control_word &= ~AD9851_POWER_DOWN_D7;  // 清除D7位，确保正常工作
     
-    // 检查控制字是否正确
-    AD9851_Check_Control_Word(control_word);
-    
     // 根据工作模式调用相应的写入函数
     if(mode == AD9851_SERIAL_MODE)
     {
@@ -241,53 +238,6 @@ void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence)
     {
         ad9851_wr_parallel(control_word, frequence);
     }
-}
-
-/**
- * @brief 设置AD9851输出频率 (简化版本，用于频率响应测量)
- * @param frequency 目标频率 (Hz)
- * @retval None
- */
-/**
- * @brief 强制退出AD9851休眠模式
- * @retval None
- */
-void AD9851_Exit_Power_Down(void)
-{
-    // 发送一个正常的控制字，确保D7位为0
-    uint8_t control_word = AD9851_CTRL_NORMAL;  // 正常工作模式，D7=0
-    
-    // 使用串口模式发送控制字
-    ad9851_wr_serial(control_word, 1000000.0);  // 1MHz测试频率
-    
-    HAL_Delay(5);  // 等待芯片稳定
-    
-    #if AD9851_DEBUG_ENABLE
-    printf("AD9851: Exit Power-Down mode, Control Word: 0x%02X\r\n", control_word);
-    #endif
-}
-
-/**
- * @brief 检查AD9851控制字是否正确设置
- * @param control_word 控制字
- * @retval 1: 正常, 0: 可能有问题
- */
-uint8_t AD9851_Check_Control_Word(uint8_t control_word)
-{
-    // 检查D7位是否为0（Power-Down位）
-    if(control_word & AD9851_POWER_DOWN_D7)
-    {
-        #if AD9851_DEBUG_ENABLE
-        printf("AD9851 WARNING: Power-Down bit (D7) is set! Control Word: 0x%02X\r\n", control_word);
-        #endif
-        return 0;  // 有问题
-    }
-    
-    #if AD9851_DEBUG_ENABLE
-    printf("AD9851: Control Word OK: 0x%02X\r\n", control_word);
-    #endif
-    
-    return 1;  // 正常
 }
 
 /**

@@ -2,7 +2,7 @@
  * @Author: 杨宇菲 17786321727@163.com
  * @Date: 2025-06-30 15:51:28
  * @LastEditors: yyf 17786321727@163.com
- * @LastEditTime: 2025-07-20 15:21:35
+ * @LastEditTime: 2025-07-20 15:16:29
  * @FilePath: \AmpPerfEval\Users\ad9851\bsp_ad9851.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -65,9 +65,6 @@
 #define AD9851_CTRL_6X_FREQ     0x01    // 6倍频模式
 #define AD9851_CTRL_POWER_DOWN  0x84    // 休眠模式 (bit7=1, bit2=1)
 
-/* 调试和状态检查 */
-#define AD9851_DEBUG_ENABLE     1       // 启用调试输出
-
 /* Prototypes */
 void ad9851_reset_serial(void);
 void ad9851_reset_parallel(void);
@@ -77,7 +74,6 @@ void AD9851_Init(uint8_t mode, uint8_t FD);
 void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence);
 void AD9851_Set_Frequency(float frequency);
 void AD9851_Exit_Power_Down(void);
-uint8_t AD9851_Check_Control_Word(uint8_t control_word);
 
 #endif /* __BSP_AD9851_H */
 

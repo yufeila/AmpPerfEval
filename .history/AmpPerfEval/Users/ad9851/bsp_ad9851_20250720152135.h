@@ -77,7 +77,6 @@ void AD9851_Init(uint8_t mode, uint8_t FD);
 void AD9851_Setfq(uint8_t mode, uint8_t FD, double frequence);
 void AD9851_Set_Frequency(float frequency);
 void AD9851_Exit_Power_Down(void);
-uint8_t AD9851_Check_Control_Word(uint8_t control_word);
 
 #endif /* __BSP_AD9851_H */
 
