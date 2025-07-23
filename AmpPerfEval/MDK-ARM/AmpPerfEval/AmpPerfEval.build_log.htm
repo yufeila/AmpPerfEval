@@ -22,29 +22,16 @@ Dialog DLL:      TCM.DLL V1.56.4.0
  
 <h2>Project:</h2>
 F:\Course_Project\2019\stm32f407\AmpPerfEval\MDK-ARM\AmpPerfEval.uvprojx
-Project File Date:  07/08/2025
+Project File Date:  07/23/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 7 (build 960)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
 Build target 'AmpPerfEval'
-compiling sweep_freq_response.c...
-..\Users\data_process\sweep_freq_response.c(349): warning:  #550-D: variable "result_valid"  was set but never used
-          bool result_valid = true;
-..\Users\data_process\sweep_freq_response.c(392): warning:  #1035-D: single-precision operand implicitly converted to double-precision
-      float Rin = (V_s * 1e-3 * 0.5 - res->adc_in_Result.amplitude/V_Rs_Gain)/(res->adc_in_Result.amplitude/V_Rs_Gain) * R_s;
-..\Users\data_process\sweep_freq_response.c(634): warning:  #225-D: the format string ends before this argument
-          sprintf(dispBuff, "%.3f V", v_out.amplitude, "(measured)");
-..\Users\data_process\sweep_freq_response.c(804): warning:  #1035-D: single-precision operand implicitly converted to double-precision
-              result->gain_db = 20.0f * log10f(result->output_amp / ( V_s *1e-3 - result->input_amp/V_Rs_Gain ));
-..\Users\data_process\sweep_freq_response.c(75): warning:  #177-D: function "average_float_array"  was declared but never referenced
-  static float average_float_array(const float *arr, int N)
-..\Users\data_process\sweep_freq_response.c(648): warning:  #177-D: function "DisplayRout"  was declared but never referenced
-  static void DisplayRout(float Rout)
-..\Users\data_process\sweep_freq_response.c: 6 warnings, 0 errors
+compiling key.c...
 linking...
-Program Size: Code=50988 RO-data=127284 RW-data=12368 ZI-data=39696  
+Program Size: Code=53028 RO-data=127364 RW-data=12376 ZI-data=39896  
 FromELF: creating hex file...
-"AmpPerfEval\AmpPerfEval.axf" - 0 Error(s), 6 Warning(s).
+"AmpPerfEval\AmpPerfEval.axf" - 0 Error(s), 0 Warning(s).
 
 <h2>Software Packages used:</h2>
 

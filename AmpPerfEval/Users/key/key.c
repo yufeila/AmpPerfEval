@@ -21,7 +21,7 @@ void Key_Init(void)
     GPIO_InitStruct.Pin = KEY_UP_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+//    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(KEY_UP_PORT, &GPIO_InitStruct);
 }
 
@@ -30,6 +30,7 @@ void KEY_Scan(void)
 {
     uint8_t key0_state = HAL_GPIO_ReadPin(KEY0_PORT, KEY0_PIN);
     uint8_t key1_state = HAL_GPIO_ReadPin(KEY1_PORT, KEY1_PIN);
+	uint8_t key_up_state = HAL_GPIO_ReadPin(KEY_UP_PORT, KEY_UP_PIN);
 
     static uint32_t last_tick0 = 0;
     static uint32_t last_tick1 = 0;

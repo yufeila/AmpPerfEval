@@ -69,6 +69,7 @@ static void Update_Measurement_Progress(uint8_t current_point, uint8_t total_poi
 static void Display_3dB_Frequency(float freq_3db);  // 显示-3dB截止频率
 static void Display_Measurement_Statistics(FreqResponse_t* freq_response_data, int len);  // 显示测量统计信息
 void plot_Frequency_Response_Point(FreqResponse_t point);  // 绘制单个频率响应数据点
+float Calculate_Gain_Variance(FreqResponse_t* freq_response, int len);
 
 /* ============ 基本测量部分 ============ */
 
@@ -847,7 +848,7 @@ static void Measure_Single_Point(float frequency, FreqResponse_t* result, float 
                result->output_amp,                                    // 输出幅度
                result->dc_out,                                        // 输出直流电压
                result->gain_db,                                       // 增益(dB)
-               fs,                                                    // 采样频率
+               fs                                                    // 采样频率
                );                                      
     }
     else
@@ -1271,6 +1272,7 @@ void Fault_Detection(void)
     static uint8_t first_refresh = 1;
     static uint8_t fault_detected = 0;
     static uint8_t fault_type = 0;
+	static float current_fs = 0.0f;
 
     if(fault_detection_flag)
     {
@@ -1304,7 +1306,7 @@ void Fault_Detection(void)
     float input_amp = V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain;
 
     // 2. 计算输出信号的幅值
-    float output_amp = data_at_1k.adc_ac_out_Result.max_amp;
+    float output_amp = data_at_1k.adc_ac_out_Result.amplitude;
 
     // 3. 计算增益
     float gain = output_amp / input_amp;
@@ -1387,7 +1389,7 @@ void Fault_Detection(void)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R2 Open Circuit");
                 }
-                else if( fabs(data_at_1k.adc_dc_out_Result - 2.24f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 0.0 f) < 0.5f)
+                else if( fabs(data_at_1k.adc_dc_out_Result - 2.24f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 0.0f) < 0.5f)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R2 Short Circuit");
                 }
@@ -1395,15 +1397,15 @@ void Fault_Detection(void)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R3 Open Circuit");
                 }
-                else if( fabs(data_at_1k.adc_dc_out_Result - 2.25f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 2.0 f) < 0.5f)
+                else if( fabs(data_at_1k.adc_dc_out_Result - 2.25f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 2.0f) < 0.5f)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R3 Short Circuit");
                 }
-                else if ( fabs(data_at_1k.adc_dc_out_Result - 2.24f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 11.0 f) < 0.5f)
+                else if ( fabs(data_at_1k.adc_dc_out_Result - 2.24f) < 0.1f && fabs(CalculateRin(&data_at_1k) - 11.0f) < 0.5f)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R4 Open Circuit");
                 }
-                else if( fabs(data_at_1k.adc_dc_out_Result - 0.0f) < 0.01f && fabs(CalculateRin(&data_at_1k) - 0.0 f) < 0.5f)
+                else if( fabs(data_at_1k.adc_dc_out_Result - 0.0f) < 0.01f && fabs(CalculateRin(&data_at_1k) - 0.0f) < 0.5f)
                 {
                     LCD_ShowString(10, 60, 220, 16, 12, (uint8_t*)"R4 Short Circuit");
                 }
@@ -1454,6 +1456,7 @@ float Calculate_Gain_Variance(FreqResponse_t* freq_response, int len)
 {
     float average_gain = 0.0f;
     float sum_gain = 0.0f;
+	float sgain = 0.0f;
 
     for(uint8_t i = 0; i < len; i++)
     {
