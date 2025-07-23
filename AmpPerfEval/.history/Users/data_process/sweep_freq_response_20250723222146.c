@@ -827,7 +827,7 @@ static void Measure_Single_Point(float frequency, FreqResponse_t* result, float 
         // ¼ÆËãÔöÒæ(dB)
         if (result->input_amp > 0.001f)
         {
-            result->gain_db = 20.0f * log10f(result->output_amp * 247/(11 * 47)/ ( V_s * 1e-3 * 0.5 - result->input_amp/V_Rs_Gain ));
+            result->gain_db = 20.0f * log10f(result->output_amp * 247/(11 * 47)/ ( V_s *1e-3 - result->input_amp/V_Rs_Gain ));
         }
         else
         {

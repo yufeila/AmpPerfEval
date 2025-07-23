@@ -627,10 +627,10 @@ void Basic_Measurement_Page_Update(void)
     LCD_ShowString(90, 235, 120, 12, 12, (uint8_t*)dispBuff);
     
     /* 开路增益显示 */
-    LCD_Fill(90, 275, 230, 287, WHITE);
+    LCD_Fill(90, 27560, 230, 172, WHITE);
     /* 计算开路增益 */
-    float gain = (data_at_1k.adc_ac_out_Result.amplitude * 247 /(11.0 * 47.0)) / (V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain) ;
-    sprintf(dispBuff, "%.3f ", gain);
+    float gain = (data_at_1k.adc_ac_out_Result.amplitude * 11 * 47/247) / (V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain) ;
+    sprintf(dispBuff, "%.3f V", gain);
     LCD_ShowString(90, 275, 120, 12, 12, (uint8_t*)dispBuff);
 
     /* 输出阻抗部分 - 根据测量状态显示 */
@@ -827,7 +827,7 @@ static void Measure_Single_Point(float frequency, FreqResponse_t* result, float 
         // 计算增益(dB)
         if (result->input_amp > 0.001f)
         {
-            result->gain_db = 20.0f * log10f(result->output_amp * 247/(11 * 47)/ ( V_s * 1e-3 * 0.5 - result->input_amp/V_Rs_Gain ));
+            result->gain_db = 20.0f * log10f(result->output_amp / ( V_s *1e-3 - result->input_amp/V_Rs_Gain ));
         }
         else
         {

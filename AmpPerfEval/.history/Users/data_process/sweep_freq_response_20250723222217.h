@@ -52,7 +52,7 @@
 #define V_s                     20.8f //单位：mV
 #define V_Rs_Gain               110.0f
 #define R_s                     6.2f //单位：kΩ
-#define R_L                     2.0f   //单位：kΩ     
+#define R_L                     20.0f   //单位：kΩ     
 
 // 故障检测相关参数定义
 #define NORMAL_GAIN_AT_1K    2.3f  // 单位: kΩ
