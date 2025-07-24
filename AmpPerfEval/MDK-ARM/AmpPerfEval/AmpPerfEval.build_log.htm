@@ -27,11 +27,30 @@ Project File Date:  07/23/2025
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 7 (build 960)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
 Build target 'AmpPerfEval'
-compiling key.c...
+compiling sweep_freq_response.c...
+..\Users\data_process\sweep_freq_response.c(354): warning:  #550-D: variable "result_valid"  was set but never used
+          bool result_valid = true;
+..\Users\data_process\sweep_freq_response.c(397): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+      float Rin = (V_s * 1e-3 * 0.5 - res->adc_in_Result.amplitude/V_Rs_Gain)/(res->adc_in_Result.amplitude/V_Rs_Gain) * R_s;
+..\Users\data_process\sweep_freq_response.c(633): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+      float gain = (data_at_1k.adc_ac_out_Result.amplitude * 247 /(11.0 * 47.0)) / (V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain) ;
+..\Users\data_process\sweep_freq_response.c(657): warning:  #225-D: the format string ends before this argument
+          sprintf(dispBuff, "%.3f V", v_out.amplitude, "(measured)");
+..\Users\data_process\sweep_freq_response.c(833): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+              result->gain_db = 20.0f * log10f(result->output_amp /2.07 / ( V_s * 1e-3 * 0.5 - result->input_amp/V_Rs_Gain ));
+..\Users\data_process\sweep_freq_response.c(833): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+              result->gain_db = 20.0f * log10f(result->output_amp /2.07 / ( V_s * 1e-3 * 0.5 - result->input_amp/V_Rs_Gain ));
+..\Users\data_process\sweep_freq_response.c(1308): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+      float input_amp = V_s * 1e-3 * 0.5 - data_at_1k.adc_in_Result.amplitude/V_Rs_Gain;
+..\Users\data_process\sweep_freq_response.c(77): warning:  #177-D: function "average_float_array"  was declared but never referenced
+  static float average_float_array(const float *arr, int N)
+..\Users\data_process\sweep_freq_response.c(671): warning:  #177-D: function "DisplayRout"  was declared but never referenced
+  static void DisplayRout(float Rout)
+..\Users\data_process\sweep_freq_response.c: 9 warnings, 0 errors
 linking...
-Program Size: Code=53028 RO-data=127364 RW-data=12376 ZI-data=39896  
+Program Size: Code=53264 RO-data=127364 RW-data=12376 ZI-data=41096  
 FromELF: creating hex file...
-"AmpPerfEval\AmpPerfEval.axf" - 0 Error(s), 0 Warning(s).
+"AmpPerfEval\AmpPerfEval.axf" - 0 Error(s), 9 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -54,7 +73,7 @@ Package Vendor: Keil
 
    * Component: ARM::CMSIS:CORE@6.1.0
       Include file:  CMSIS/Core/Include/tz_context.h
-Build Time Elapsed:  00:00:07
+Build Time Elapsed:  00:00:05
 </pre>
 </body>
 </html>

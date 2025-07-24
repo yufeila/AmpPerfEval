@@ -20,7 +20,7 @@ void Key_Init(void)
     __HAL_RCC_GPIOA_CLK_ENABLE();
     GPIO_InitStruct.Pin = KEY_UP_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
 //    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(KEY_UP_PORT, &GPIO_InitStruct);
 }
@@ -79,7 +79,7 @@ void KEY_Scan(void)
     key1_last_state = key1_state;
 
     // ---- KEY_UP ¼ì²âÓëÏû¶¶ ----
-    if (key_up_state == GPIO_PIN_RESET && key_up_last_state == GPIO_PIN_SET)
+    if (key_up_state == GPIO_PIN_SET && key_up_last_state == GPIO_PIN_RESET)
     {
         if ((HAL_GetTick() - last_tick_up) > KEY_DEBOUNCE_DELAY)
         {
