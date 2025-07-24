@@ -1350,7 +1350,7 @@ void Fault_Detection(void)
             plot_Frequency_Response_Point(freq_response[current_point]);
             
             // 更新进度显示
-            Update_Measurement_Progress(current_point + 1, FREQ_POINTS);
+            //Update_Measurement_Progress(current_point + 1, FREQ_POINTS);
             
             // 移动到下一个频率点
             current_point++;
